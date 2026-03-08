@@ -1,0 +1,13 @@
+# Soul MCP — gitignore
+# Local config (never commit)
+lib/config.local.js
+
+# Runtime data (generated at first run)
+data/memory/
+data/projects/
+data/kv-cache/
+!data/_template/
+!data/README.md
+
+# Node
+node_modules/

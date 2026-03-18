@@ -343,9 +343,6 @@ Apache-2.0
 
 ## Contributing
 
-> **If you find Soul helpful, please consider giving us a star! ⭐**
-> It helps others discover this project and motivates us to keep building.
-
 Contributions are welcome! Here's how to get started:
 
 1. Fork the repo
@@ -357,6 +354,8 @@ Contributions are welcome! Here's how to get started:
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Star History
+
+If you find Soul helpful, please consider giving us a star! ⭐
 
 [![Star History Chart](https://api.star-history.com/svg?repos=choihyunsus/soul&type=Date)](https://star-history.com/#choihyunsus/soul&Date)
 

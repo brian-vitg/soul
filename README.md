@@ -359,6 +359,8 @@ If you find Soul helpful, please consider giving us a star! ⭐
 
 ---
 
+> *"I built Soul because it broke my heart watching my agents lose their memory every session."*
+
 🌐 [nton2.com](https://nton2.com) · 📦 [npm](https://www.npmjs.com/package/n2-soul) · ✉️ lagi0730@gmail.com
 
 <sub>👋 Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>

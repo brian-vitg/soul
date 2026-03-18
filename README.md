@@ -357,8 +357,6 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 If you find Soul helpful, please consider giving us a star! ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=choihyunsus/soul&type=Date)](https://star-history.com/#choihyunsus/soul&Date)
-
 ---
 
 🌐 [nton2.com](https://nton2.com) · 📦 [npm](https://www.npmjs.com/package/n2-soul) · ✉️ lagi0730@gmail.com

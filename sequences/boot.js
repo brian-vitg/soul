@@ -1,19 +1,23 @@
-// Soul MCP v4.1 — Boot sequence. Handoff + KV-Cache restore.
+// Soul MCP v5.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
 const path = require('path');
 const fs = require('fs');
 const { readJson, today, nowISO, logError } = require('../lib/utils');
 const { detectAgentsDir, listAgents } = require('../lib/agent-registry');
 const { SoulEngine } = require('../lib/soul-engine');
 const { setAgentName, setKvChainParent } = require('../lib/context');
+const { EntityMemory } = require('../lib/entity-memory');
+const { CoreMemory } = require('../lib/core-memory');
 
 function registerBootSequence(server, z, config) {
     const engine = new SoulEngine(config.DATA_DIR);
+    const entityMemory = new EntityMemory(config.DATA_DIR);
+    const coreMemory = new CoreMemory(config.DATA_DIR);
 
     server.registerTool(
         'n2_boot',
         {
             title: 'Soul Boot',
-            description: 'Boot sequence — loads soul-board handoff, agent list, and KV-Cache context.',
+            description: 'Boot sequence — loads soul-board handoff, entity/core memory, agent list, and KV-Cache context.',
             inputSchema: {
                 agent: z.string().describe('Agent name'),
                 project: z.string().optional().describe('Project name to load context for'),
@@ -28,7 +32,7 @@ function registerBootSequence(server, z, config) {
             const agentName = agent || process.env.N2_AGENT_NAME || 'default';
             setAgentName(agentName);
 
-            lines.push(`--- Soul Boot | ${agentName} | ${today()} ---`);
+            lines.push(`--- Soul Boot v5.0 | ${agentName} | ${today()} ---`);
             if (agents.length > 0) {
                 lines.push(`Agents: ${agents.map(a => `${a.name}[${a.model}]`).join(', ')}`);
             }
@@ -72,7 +76,27 @@ function registerBootSequence(server, z, config) {
                 } catch (e) { logError('boot:kv-cache', e); }
             }
 
-            lines.push(`\n--- Soul Boot complete ---`);
+            // -- Entity Memory: inject known entities summary --
+            try {
+                entityMemory.invalidateCache(); // fresh read on each boot
+                const entityCtx = entityMemory.toContext(10);
+                if (entityCtx) lines.push(`\n${entityCtx}`);
+            } catch (e) {
+                logError('boot:entity-memory', e);
+                lines.push(`\n⚠️ Entity Memory: ${e.message}`);
+            }
+
+            // -- Core Memory: inject agent-specific core facts --
+            try {
+                coreMemory.invalidateCache(); // fresh read on each boot
+                const coreCtx = coreMemory.toPrompt(agentName, 500);
+                if (coreCtx) lines.push(coreCtx);
+            } catch (e) {
+                logError('boot:core-memory', e);
+                lines.push(`⚠️ Core Memory: ${e.message}`);
+            }
+
+            lines.push(`\n--- Soul Boot v5.0 complete ---`);
             return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
     );

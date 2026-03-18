@@ -1,0 +1,8 @@
+# npm 배포 시 제외할 파일
+docs/
+data/
+.git/
+.gitignore
+node_modules/
+*.png
+*.jpg

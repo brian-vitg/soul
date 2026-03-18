@@ -1,6 +1,6 @@
 {
-    "name": "soul",
-    "version": "4.1.0",
+    "name": "n2-soul",
+    "version": "5.0.0",
     "description": "Multi-agent session orchestrator with KV-Cache for MCP (Model Context Protocol)",
     "main": "index.js",
     "scripts": {
@@ -8,11 +8,21 @@
     },
     "keywords": [
         "mcp", "multi-agent", "kv-cache", "session", "orchestrator",
-        "ai-agent", "model-context-protocol", "soul"
+        "ai-agent", "model-context-protocol", "soul", "n2", "persistent-memory"
     ],
     "license": "Apache-2.0",
     "homepage": "https://nton2.com",
     "author": "N2 <lagi0730@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/choihyunsus/soul.git"
+    },
+    "bugs": {
+        "url": "https://github.com/choihyunsus/soul/issues"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
     "dependencies": {
         "@modelcontextprotocol/sdk": "~1.6.1",
         "zod": "~3.24.1",

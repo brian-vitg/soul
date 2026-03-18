@@ -1,12 +1,15 @@
-// Soul MCP v4.1 — End sequence. Ledger + board handoff + KV-Cache snapshot.
+// Soul MCP v5.0 — End sequence. Ledger + board handoff + KV-Cache + entities/insights auto-save.
 const path = require('path');
+const fs = require('fs');
 const { nowISO, logError } = require('../lib/utils');
 const { SoulEngine } = require('../lib/soul-engine');
 const { popKvChainParent } = require('../lib/context');
 const { activeSessions } = require('./work');
+const { EntityMemory } = require('../lib/entity-memory');
 
 function registerEndSequence(server, z, config) {
     const engine = new SoulEngine(config.DATA_DIR);
+    const entityMemory = new EntityMemory(config.DATA_DIR);
 
     server.registerTool(
         'n2_work_end',
@@ -20,9 +23,15 @@ function registerEndSequence(server, z, config) {
                 summary: z.string().describe('Work summary'),
                 todo: z.array(z.string()).optional().describe('Next TODO items'),
                 decisions: z.array(z.string()).optional().describe('Key decisions made'),
+                entities: z.array(z.object({
+                    type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
+                    name: z.string().describe('Entity name'),
+                    attributes: z.record(z.any()).optional().describe('Key-value attributes'),
+                })).optional().describe('Entities discovered during session (auto-saved to Entity Memory)'),
+                insights: z.array(z.string()).optional().describe('Permanent knowledge/insights to remember'),
             },
         },
-        async ({ agent, project, title, summary, todo, decisions }) => {
+        async ({ agent, project, title, summary, todo, decisions, entities, insights }) => {
             const session = activeSessions[project] || {};
             const allDecisions = [...(session.decisions || []), ...(decisions || [])];
 
@@ -107,6 +116,27 @@ function registerEndSequence(server, z, config) {
                     logError('end:kv-cache', e);
                 }
             }
+
+            // 8. Auto-save entities to Entity Memory
+            if (entities && entities.length > 0) {
+                try {
+                    const result = entityMemory.upsertBatch(entities);
+                    // result logged silently
+                } catch (e) { logError('end:entity-memory', e); }
+            }
+
+            // 9. Save insights to memory
+            if (insights && insights.length > 0) {
+                try {
+                    const insightsDir = path.join(config.DATA_DIR, 'memory', 'auto-extract', project);
+                    if (!fs.existsSync(insightsDir)) fs.mkdirSync(insightsDir, { recursive: true });
+                    const dateStr = nowISO().split('T')[0];
+                    const filePath = path.join(insightsDir, `${dateStr}.md`);
+                    const content = `# Auto-Extract: ${project}\n## ${agent} — ${title}\n\n${insights.map(i => `- ${i}`).join('\n')}\n`;
+                    fs.appendFileSync(filePath, content + '\n', 'utf-8');
+                } catch (e) { logError('end:insights', e); }
+            }
+
 
             const totalFiles = (session.filesCreated || []).length +
                 (session.filesModified || []).length +

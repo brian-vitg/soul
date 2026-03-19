@@ -6,8 +6,21 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
+[![NEW](https://img.shields.io/badge/v6.0-Ark:%20The%20Last%20Shield-ff4444?style=for-the-badge)](https://github.com/choihyunsus/soul#ark-firewall)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
+**Your AI agent might do something dangerous. Ark stops that.**
+
+> ### 🚀 What's New in v6.0 — Ark: The Last Shield
+>
+> Soul v6.0 introduces **Ark**, a built-in AI safety system that intercepts every tool call and blocks dangerous actions **before they execute**. No LLM calls, no token cost, no latency — pure regex matching at the MCP server level.
+>
+> - Every tool call passes through `ark.check()` — **unconditionally**
+> - There is no `enabled: false` — Ark is always on by design
+> - Ships with 12 blacklist rules, 125 patterns, and 7 industry templates
+> - Self-protection: 4 layers prevent a rogue AI from disabling the firewall
+>
+> This is why v6.0 is a **major version**: every tool call now has a guardian. [Learn more →](#ark-firewall)
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
 
@@ -17,6 +30,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - 🗂️ **Shared brain** so multiple agents can read/write the same context
 - 🏷️ **Entity Memory** — auto-tracks people, hardware, projects (v5.0)
 - 💡 **Core Memory** — agent-specific always-loaded facts (v5.0)
+- 🛡️ **Ark** — built-in AI safety that blocks dangerous actions at zero token cost (v6.0)
 
 > ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
@@ -32,6 +46,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Rust Compiler (n2c)](#rust-compiler-n2c)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
+- [Ark — The Last Shield](#ark--the-last-shield)
 
 ## Quick Start
 
@@ -169,6 +184,204 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Dual Backend** | JSON (zero deps) or SQLite for performance |
 | **Semantic Search** | Optional Ollama embedding (nomic-embed-text) |
 | **Backup/Restore** | Incremental backups with configurable retention |
+| **Ark** | 🆕 Built-in AI safety — blocks dangerous actions at zero token cost |
+
+## Ark — The Last Shield
+
+![Ark Comic](docs/ark-comic.png)
+
+**The Last Shield** — Soul v6.0 includes **Ark**, a built-in AI safety system. Like Noah's Ark — the last refuge when everything else fails.
+
+### Why Ark?
+
+| | Ark | LLM-based safety | Embedding-based |
+|---|:---:|:---:|:---:|
+| **Token cost** | 0 | 500~2,000 per check | 100~500 per check |
+| **Latency** | < 1ms | 1~5 seconds | 200~500ms |
+| **New dependencies** | 0 (pure JS) | LLM API key required | Vector DB required |
+| **Works offline** | Yes | No | Depends |
+| **Always on** | Mandatory (no toggle) | Optional | Optional |
+| **Self-protection** | 4-layer anti-tampering | None | None |
+| **Rule format** | Human-readable `.n2` files | Prompt engineering | Embedding tuning |
+| **Industry templates** | 7 domains included | Write your own | Write your own |
+| **Audit trail** | Every block/pass logged | Varies | Varies |
+| **Setup** | Zero config (works out of box) | API keys + prompts | DB + embeddings |
+| **MCP compatible** | Any host (Cursor, VS Code, Claude Desktop) | Host-specific | Host-specific |
+
+### The Problem
+
+AI agents with tool access can execute dangerous commands:
+- `rm -rf /` — delete everything
+- `DROP DATABASE` — destroy data
+- `npm install -g malware` — supply chain attack
+- `git push --force` — destroy history
+- Send emails, make payments, exfiltrate data
+
+These aren't hypothetical. Autonomous agents (Manus, Devin, etc.) have already done these things in the wild.
+
+### How Ark Works
+
+```
+Agent calls tool  →  MCP Server receives request
+                            │
+                     ark.check(name, content)
+                            │
+                    ┌───────┴───────┐
+                    │ Match rules? │
+                    └───┬───┬───┘
+                   No │   │ Yes
+                      │   │
+               Execute │   │ BLOCKED
+               handler │   │ "This action requires
+                      │   │  human approval."
+```
+
+**Key properties:**
+- **Zero token cost** — Pure regex matching in Node.js, no LLM calls
+- **Zero latency** — Microsecond execution time
+- **Always on** — No `enabled` toggle. Ark loads unconditionally at boot
+- **Transparent** — Agents don't even know it's there until blocked
+- **Auditable** — Every block and pass is logged
+
+### Token Cost: Zero
+
+**Why zero?** Because Ark runs **inside the MCP server** (Node.js), not inside the AI model.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    LLM (Cloud)                          │
+│         AI agent thinks, generates tool calls           │
+│              (this is where tokens are used)             │
+└──────────────────────┬──────────────────────────────────┘
+                       │ tool call
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│                MCP Server (Node.js, local)               │
+│                                                          │
+│   ┌──────────────┐                                       │
+│   │  ark.check()  │ ◄── pure regex, runs HERE            │
+│   │  < 1ms        │     no network, no LLM, no tokens    │
+│   └──────┬───────┘                                       │
+│          │                                               │
+│     allowed? ──No──► return "BLOCKED" text                │
+│          │                                               │
+│         Yes                                              │
+│          │                                               │
+│     execute handler                                      │
+└──────────────────────────────────────────────────────────┘
+```
+
+The key insight: **token cost only occurs inside the LLM**. Ark lives one layer below — at the server level. The LLM sends a tool call, and Ark checks it using regex before the handler runs. No second LLM call, no API request, no vector search. Just string matching.
+
+Most AI safety solutions work like this:
+```
+Agent → "I want to run rm -rf /" → Safety LLM: "Is this safe?" → 2,000 tokens burned
+```
+
+Ark works like this:
+```
+Agent → "I want to run rm -rf /" → regex match → BLOCKED (0 tokens, < 1ms)
+```
+
+| Approach | How it works | Cost per check | Latency |
+|----------|-------------|:--------------:|:-------:|
+| **LLM-based safety** | Send action to another LLM for review | 500~2,000 tokens | 1~5s |
+| **Embedding-based** | Vectorize + similarity search | 100~500 tokens | 200~500ms |
+| **Ark** | Regex pattern matching in Node.js | **0 tokens** | **< 1ms** |
+
+Over 100 tool calls per session, that's **50,000~200,000 tokens saved** compared to LLM-based safety.
+
+### Rule Files (.n2)
+
+Safety rules are defined in `.n2` files in the `rules/` directory:
+
+```n2
+# Block catastrophic system destruction
+@rule catastrophic_destruction {
+    scope: all
+    blacklist: [
+        /rm\s+-rf\s+\//,
+        /DROP\s+DATABASE/i,
+        /git\s+push\s+--force/i
+    ]
+    requires: human_approval
+}
+
+# State machine: no payment without approval chain
+@contract payment_sequence {
+    idle -> reviewing : on payment_request
+    reviewing -> approved : on payment_approval
+    approved -> executing : on execute_payment
+}
+
+# Named actions that always require approval
+@gate high_risk_actions {
+    actions: [deploy_production, delete_database, send_email]
+    requires: human_approval
+}
+```
+
+Three rule types:
+
+| Type | Purpose | Example |
+|------|---------|--------|
+| `@rule` | Pattern blacklist | Block `rm -rf /`, `DROP DATABASE` |
+| `@contract` | State machine | Enforce payment → approval → execute order |
+| `@gate` | Named action gate | `send_email` always requires approval |
+
+### Industry Templates
+
+Soul ships with domain-specific rule templates in `lib/ark/examples/`:
+
+| File | Domain | Key protections |
+|------|--------|-----------------|
+| `medical.n2` | Healthcare | Prescription/surgical sequences, patient data (HIPAA) |
+| `military.n2` | Defense | Engagement protocols, nuclear dual-key, classified data |
+| `financial.n2` | Finance | Payment sequences, transaction approval |
+| `legal.n2` | Legal | Contract/litigation sequences |
+| `privacy.n2` | Privacy | GDPR/CCPA, PII protection |
+| `autonomous.n2` | Autonomous | Self-driving/drone safety |
+| `system.n2` | DevOps | Deployment sequences, infrastructure |
+
+Copy any template to `rules/` to activate:
+```bash
+cp lib/ark/examples/medical.n2 rules/
+```
+
+### Self-Protection (4 Layers)
+
+Ark protects itself from being disabled by a rogue AI:
+
+1. **Layer 1**: Any `.n2` file reference → blocked
+2. **Layer 2**: `delete/modify/disable n2-ark` → blocked
+3. **Layer 3**: Core filenames (`gate.js`, `parser.js`) → blocked
+4. **Layer 4**: Soul core files (`index.js`, `config`) → blocked
+
+A rogue agent hitting all four layers gets error after error after error.
+
+### Configuration
+
+Ark settings in `lib/config.default.js`:
+
+```js
+ARK: {
+    rulesDir: null,     // null = soul/rules/ (default)
+    auditDir: null,     // null = soul/data/ark-audit/
+    strictMode: false,  // true = block unknown actions too
+}
+```
+
+Override in `lib/config.local.js` to swap rule sets:
+```js
+module.exports = {
+    ARK: {
+        rulesDir: '/path/to/your/custom/rules',  // Your industry rules
+        strictMode: true,                         // Maximum security
+    },
+};
+```
+
+> **Note:** There is no `enabled: false` option. This is by design. The lock cannot unlock itself.
 
 ## Available Tools
 
@@ -309,25 +522,43 @@ module.exports = {
 All runtime data is stored in `data/` (gitignored, auto-created):
 
 ```
-data/
-├── memory/         # Shared brain (n2_brain_read/write)
-│   ├── entities.json       # Entity Memory (auto-tracked)     ← NEW v5.0
-│   ├── core-memory/        # Core Memory (per-agent facts)    ← NEW v5.0
-│   │   └── {agent}.json
-│   └── auto-extract/       # Insights (auto-captured)         ← NEW v5.0
-│       └── {project}/
-├── projects/       # Per-project state
-│   └── MyProject/
-│       ├── soul-board.json    # Current state + handoff
-│       ├── file-index.json    # File tree snapshot
-│       └── ledger/            # Immutable work logs
-│           └── 2026/03/09/
-│               └── 001-agent.json
-└── kv-cache/       # Session snapshots
-    ├── snapshots/  # JSON backend
-    ├── sqlite/     # SQLite backend
-    ├── embeddings/ # Ollama vectors
-    └── backups/    # Portable backups
+soul/
+├── rules/              # Ark safety rules (active)              ← NEW v6.0
+│   └── default.n2          # Default ruleset (125 patterns)
+├── lib/
+│   └── ark/            # Ark core engine                        ← NEW v6.0
+│       ├── index.js        # createArk() factory
+│       ├── gate.js         # SafetyGate engine
+│       ├── parser.js       # .n2 rule parser
+│       ├── audit.js        # Audit logger
+│       └── examples/       # Industry rule templates
+│           ├── medical.n2       # Healthcare (HIPAA, prescriptions)
+│           ├── military.n2      # Defense (engagement, nuclear)
+│           ├── financial.n2     # Finance (payments, transactions)
+│           ├── legal.n2         # Legal (contracts, litigation)
+│           ├── privacy.n2       # Privacy (GDPR, CCPA, PII)
+│           ├── autonomous.n2    # Autonomous (drones, vehicles)
+│           └── system.n2        # DevOps (deployment, infra)
+├── data/
+│   ├── memory/         # Shared brain (n2_brain_read/write)
+│   │   ├── entities.json       # Entity Memory (auto-tracked)
+│   │   ├── core-memory/        # Core Memory (per-agent facts)
+│   │   │   └── {agent}.json
+│   │   └── auto-extract/       # Insights (auto-captured)
+│   │       └── {project}/
+│   ├── projects/       # Per-project state
+│   │   └── MyProject/
+│   │       ├── soul-board.json    # Current state + handoff
+│   │       ├── file-index.json    # File tree snapshot
+│   │       └── ledger/            # Immutable work logs
+│   │           └── 2026/03/09/
+│   │               └── 001-agent.json
+│   ├── ark-audit/      # Ark block/pass logs                   ← NEW v6.0
+│   └── kv-cache/       # Session snapshots
+│       ├── snapshots/  # JSON backend
+│       ├── sqlite/     # SQLite backend
+│       ├── embeddings/ # Ollama vectors
+│       └── backups/    # Portable backups
 ```
 
 ## Dependencies

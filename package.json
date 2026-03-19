@@ -1,7 +1,7 @@
 {
     "name": "n2-soul",
-    "version": "5.0.1",
-    "description": "Multi-agent session orchestrator with KV-Cache for MCP (Model Context Protocol)",
+    "version": "6.0.0",
+    "description": "Multi-agent session orchestrator with KV-Cache and Ark for MCP (Model Context Protocol)",
     "main": "index.js",
     "scripts": {
         "start": "node index.js"
@@ -16,7 +16,10 @@
         "model-context-protocol",
         "soul",
         "n2",
-        "persistent-memory"
+        "persistent-memory",
+        "ai-safety",
+        "safety",
+        "n2-ark"
     ],
     "license": "Apache-2.0",
     "homepage": "https://nton2.com",

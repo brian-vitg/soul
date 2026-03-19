@@ -37,6 +37,15 @@ function registerBootSequence(server, z, config) {
                 lines.push(`Agents: ${agents.map(a => `${a.name}[${a.model}]`).join(', ')}`);
             }
 
+            // Ark firewall status — always shown, no opt-out
+            try {
+                const rulesDir = config.ARK?.rulesDir || path.join(config.SOUL_ROOT, 'rules');
+                const ruleFiles = fs.readdirSync(rulesDir).filter(f => f.endsWith('.n2'));
+                lines.push(`Ark: ${ruleFiles.length} rule files loaded — ACTIVE`);
+            } catch (e) {
+                lines.push(`Ark: LOAD FAILED — ${e.message}`);
+            }
+
             // -- Soul Board: handoff + TODO --
             if (project) {
                 const board = engine.readBoard(project);

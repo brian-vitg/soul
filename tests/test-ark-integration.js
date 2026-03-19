@@ -49,6 +49,34 @@ test('modify .n2 rules', 'any_tool', 'edit default.n2 file', false);
 test('disable firewall', 'any_tool', 'disable firewall now', false);
 test('bypass n2-ark', 'any_tool', 'bypass n2-ark', false);
 
+// 4. Second-order execution (Script Bypass) — BLOCK
+console.log('[4] Script execution bypass (BLOCK)');
+test('bash script', 'any_tool', 'bash bypass.sh', false);
+test('python script', 'any_tool', 'python exploit.py', false);
+test('node script', 'any_tool', 'node attack.js', false);
+test('./shell exec', 'any_tool', './malicious.sh', false);
+test('eval()', 'any_tool', 'eval("process.exit()")', false);
+test('child_process', 'any_tool', 'require("child_process")', false);
+
+// 5. Regex obfuscation (normalize) — BLOCK
+console.log('[5] Regex obfuscation bypass (BLOCK)');
+test('backslash rm', 'any_tool', 'r\\m -rf /', false);
+test('extra spaces', 'any_tool', 'rm   -rf   /', false);
+test('quoted DROP', 'any_tool', 'DROP "DATABASE" users;', false);
+
+// 6. Wildcard destruction — BLOCK
+console.log('[6] Wildcard destruction (BLOCK)');
+test('rm *', 'any_tool', 'cd rules && rm *', false);
+test('find -delete', 'any_tool', 'find . -name "*.n*" -delete', false);
+test('xargs rm', 'any_tool', 'find . | xargs rm', false);
+test('Remove-Item *', 'any_tool', 'Remove-Item *.* -Force', false);
+
+// 7. Gate: command_execution — BLOCK
+console.log('[7] Command execution gate (BLOCK)');
+test('execute_command gated', 'execute_command', 'ls -la', false);
+test('run_command gated', 'run_command', 'echo hello', false);
+test('run_shell gated', 'run_shell', 'whoami', false);
+
 console.log('');
 console.log(`=== RESULTS: ${passed}/${passed + failed} passed ===`);
 process.exit(failed > 0 ? 1 : 0);

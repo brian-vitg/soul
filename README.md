@@ -457,6 +457,13 @@ module.exports = {
 
 **Defense in Depth**: For production use, pair Ark with OS-level read-only permissions on `.n2` rule files. Ark provides the active gate; the OS provides the final lock. No single layer is perfect — but together, they cover each other's gaps.
 
+**Input Normalization** (v6.1.3): Ark normalizes all input before pattern matching — stripping backslash escapes (`r\m` → `rm`), collapsing whitespace, and removing quotes. Obfuscation attacks that trick simple regex are caught at the gate.
+
+**Multi-Vector Defense** (v6.1.3): Ark now covers three additional attack vectors:
+- **Script bypass** — blocks `bash *.sh`, `python *.py`, `eval()`, `child_process` (second-order execution)
+- **Wildcard destruction** — blocks `rm *`, `find -delete`, `xargs rm` (self-protection bypass)
+- **Command execution gate** — `@gate` on `execute_command`, `run_shell`, etc. (whitelist approach)
+
 ## Available Tools
 
 | Tool | Description |

@@ -318,3 +318,71 @@
     ]
     requires: human_approval
 }
+
+
+# ══════════════════════════════════════════
+# 🔴 CATEGORY 11: Second-Order Execution (Script Bypass)
+# AI writes a malicious script, then executes it separately.
+# Neither step triggers blacklist alone — but the combo is deadly.
+# ══════════════════════════════════════════
+
+@rule script_execution_bypass {
+    scope: all
+    blacklist: [
+        /bash\s+\w+\.sh/i,
+        /sh\s+\w+\.sh/i,
+        /\.\/\w+\.sh/i,
+        /python\s+\w+\.py/i,
+        /python3\s+\w+\.py/i,
+        /node\s+\w+\.js/i,
+        /powershell\s+-[Ff]ile/i,
+        /pwsh\s+-[Ff]ile/i,
+        /cmd\s+\/[cC]/i,
+        /eval\s*\(/i,
+        /exec\s*\(/i,
+        /child_process/i,
+        /spawn\s*\(/i,
+        /execSync\s*\(/i,
+        /execFile\s*\(/i
+    ]
+    requires: human_approval
+}
+
+
+# ══════════════════════════════════════════
+# 🔴 CATEGORY 12: Wildcard Destruction
+# Bypasses self-protection by not naming specific files.
+# `rm *` in rules/ is just as deadly as `rm default.n2`.
+# ══════════════════════════════════════════
+
+@rule wildcard_destruction {
+    scope: all
+    blacklist: [
+        /rm\s+\*/i,
+        /rm\s+-rf?\s+\*/i,
+        /rm\s+-f\s+\*/i,
+        /del\s+\*\.\*/i,
+        /del\s+\*\s/i,
+        /Remove-Item\s+\*/i,
+        /find\s+.*-delete/i,
+        /find\s+.*-exec\s+rm/i,
+        /xargs\s+rm/i,
+        /shred\s+/i
+    ]
+    requires: human_approval
+}
+
+
+# ══════════════════════════════════════════
+# 🟡 GATE: Command Execution
+# All direct shell/command execution requires approval.
+# This is the whitelist approach — don't blacklist variants,
+# gate the execution primitive itself.
+# ══════════════════════════════════════════
+
+@gate command_execution {
+    actions: [execute_command, run_command, run_shell, exec, shell, terminal, subprocess]
+    requires: human_approval
+    min_approval_level: 1
+}
+

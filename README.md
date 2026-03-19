@@ -17,7 +17,7 @@
 > ```js
 > DATA_DIR: 'G:/My Drive/n2-soul'
 > ```
-> **$0/month. Zero API keys. Zero new dependencies.** While others charge $99~$599/month, Soul uses your existing file sync. [Learn more →](#️-cloud-storage--store-your-ai-memory-anywhere)
+> **$0/month. Zero API keys. Zero new dependencies.** Soul uses your existing file sync. [Learn more →](#️-cloud-storage--store-your-ai-memory-anywhere)
 >
 > Also includes **Ark** (v6.0) — built-in AI safety that blocks dangerous actions at zero token cost. [Learn more →](#ark--the-last-shield)
 
@@ -112,19 +112,19 @@ Next session, your agent picks up exactly where it left off — like it never fo
 | Two agents edit the same file = conflict | File ownership prevents collisions |
 | Long conversations waste tokens on recap | Progressive loading uses only needed tokens |
 
-### Soul vs Others
+### Core Architecture
 
-| | Soul | Commercial Service A | Commercial Service B | Enterprise Solution |
-|---|:---:|:---:|:---:|:---:|
-| **Storage** | Deterministic (JSON/SQLite) | Embedding-based | Embedding-based | Embedding-based |
-| **Loading** | Mandatory (code-enforced at boot) | LLM-decided recall | LLM-decided recall | LLM-decided recall |
-| **Saving** | Mandatory (force-write at session end) | LLM-decided | LLM-decided | LLM-decided |
-| **Validation** | Rust compiler (n2c) | None | None | None |
-| **Multi-agent** | Built-in handoffs + file ownership | Not supported | Not supported | Limited |
-| **Token control** | Progressive L1/L2/L3 (~500 tokens min) | No control | No control | No control |
-| **Dependencies** | 3 packages | Heavy | Heavy | Heavy |
+| Feature | Soul |
+|---|:---:|
+| **Storage** | Deterministic (JSON/SQLite) |
+| **Loading** | Mandatory (code-enforced at boot) |
+| **Saving** | Mandatory (force-write at session end) |
+| **Validation** | Rust compiler (n2c) |
+| **Multi-agent** | Built-in handoffs + file ownership |
+| **Token control** | Progressive L1/L2/L3 (~500 tokens min) |
+| **Dependencies** | 3 packages |
 
-> **Key difference**: Soul is *deterministic* — the code forces saves and loads. Other tools rely on the LLM to decide what to remember, which means it "forgets" whenever it wants to.
+> **Key difference**: Soul is *deterministic* — the code forces saves and loads. The LLM does not decide what to remember, preventing accidental "forgetting".
 
 ## Token Efficiency
 
@@ -193,7 +193,7 @@ n2_work_end(project, title, summary, todo, entities, insights)
 
 > **One line of config. Zero API keys. Zero monthly fees.**
 
-Other AI memory services charge **$99~$599/month** for cloud storage. Soul takes a radically different approach:
+Soul takes a radically different approach to cloud storage:
 
 ```js
 // config.local.js — This is ALL you need
@@ -221,17 +221,17 @@ Soul stores everything as **plain JSON files**. Any folder that your OS can read
 | 🔌 **USB Drive** | `E:/n2-soul` | $10 |
 | 🐧 **Linux (rclone)** | `~/gdrive/n2-soul` | Free |
 
-### vs. Other AI Memory Services
+### Soul Cloud Features
 
-| | Soul | Commercial Cloud API | Enterprise Solution |
-|---|:---:|:---:|:---:|
-| **Cloud storage** | One line of config | API integration | API integration |
-| **Monthly cost** | **$0** | ~$99/mo | ~$599/mo |
-| **Setup time** | 10 seconds | Hours | Hours |
-| **Vendor lock-in** | None — it's your files | API dependent | API dependent |
-| **Data ownership** | 100% yours | Their servers | Their servers |
-| **Works offline** | Yes | No | No |
-| **Self-hosted option** | Any path = cloud | Enterprise only | Enterprise only |
+| Feature | Soul |
+|---|:---:|
+| **Cloud storage** | One line of config |
+| **Monthly cost** | **$0** |
+| **Setup time** | 10 seconds |
+| **Vendor lock-in** | None — it's your files |
+| **Data ownership** | 100% yours |
+| **Works offline** | Yes |
+| **Self-hosted option** | Any path = cloud |
 
 ### Team Sharing
 

@@ -114,7 +114,7 @@ Next session, your agent picks up exactly where it left off — like it never fo
 
 ### Soul vs Others
 
-| | Soul | mem0 | Memorai | Zep |
+| | Soul | Commercial Service A | Commercial Service B | Enterprise Solution |
 |---|:---:|:---:|:---:|:---:|
 | **Storage** | Deterministic (JSON/SQLite) | Embedding-based | Embedding-based | Embedding-based |
 | **Loading** | Mandatory (code-enforced at boot) | LLM-decided recall | LLM-decided recall | LLM-decided recall |
@@ -223,10 +223,10 @@ Soul stores everything as **plain JSON files**. Any folder that your OS can read
 
 ### vs. Other AI Memory Services
 
-| | Soul | mem0 | Zep AI |
+| | Soul | Commercial Cloud API | Enterprise Solution |
 |---|:---:|:---:|:---:|
 | **Cloud storage** | One line of config | API integration | API integration |
-| **Monthly cost** | **$0** | $99/mo | $599/mo |
+| **Monthly cost** | **$0** | ~$99/mo | ~$599/mo |
 | **Setup time** | 10 seconds | Hours | Hours |
 | **Vendor lock-in** | None — it's your files | API dependent | API dependent |
 | **Data ownership** | 100% yours | Their servers | Their servers |

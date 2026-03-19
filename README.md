@@ -383,6 +383,14 @@ module.exports = {
 
 > **Note:** There is no `enabled: false` option. This is by design. The lock cannot unlock itself.
 
+### Security Philosophy
+
+**Transparency of `.n2` Rules**: Safety rules are **intentionally public and auditable**. This is by design — users should be able to read, customize, and verify exactly what is being blocked. There are no hidden rules, no obfuscated patterns, and no "trust us" black boxes. Open rules build trust.
+
+**Secrets stay local**: `config.local.js` is gitignored and never distributed. It exists only on the user's machine. Soul does not transmit, store, or process any API keys, passwords, or credentials.
+
+**Storage sovereignty**: All data (ledger, memory, audit logs) stays on **your machine**. You choose where backups go — local SQLite, Google Drive folder, or your own cloud. Soul never phones home.
+
 ## Available Tools
 
 | Tool | Description |

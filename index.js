@@ -15,9 +15,10 @@ const { registerEndSequence } = require('./sequences/end');
 const { registerBrainTools } = require('./tools/brain');
 const { registerKVCacheTools } = require('./tools/kv-cache');
 
+const pkg = require('./package.json');
 const server = new McpServer({
     name: 'n2-soul',
-    version: '6.1.1',
+    version: pkg.version,
 });
 
 // ═══════════════════════════════════════════════════════
@@ -29,9 +30,10 @@ const server = new McpServer({
 // The RULES decide what's blocked — not the code.
 // ═══════════════════════════════════════════════════════
 const ark = createArk({
-    rulesDir: config.ARK?.rulesDir || path.join(__dirname, 'rules'),
-    auditDir: config.ARK?.auditDir || path.join(config.DATA_DIR, 'ark-audit'),
-    strictMode: config.ARK?.strictMode || false,
+    rulesDir: config.ARK?.rulesDir ?? path.join(__dirname, 'rules'),
+    auditDir: config.ARK?.auditDir ?? path.join(config.DATA_DIR, 'ark-audit'),
+    strictMode: config.ARK?.strictMode ?? false,
+    auditMaxAgeDays: config.ARK?.auditMaxAgeDays ?? 7,
     auditEnabled: true,
 });
 

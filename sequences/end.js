@@ -66,8 +66,8 @@ function registerEndSequence(server, z, config) {
                 for (const d of allDecisions) {
                     board.decisions.push({ date: dateStr, by: agent, what: d, why: '' });
                 }
-                if (board.decisions.length > 20) {
-                    board.decisions = board.decisions.slice(-20);
+                if (board.decisions.length > (config.WORK?.maxDecisions ?? 20)) {
+                    board.decisions = board.decisions.slice(-(config.WORK?.maxDecisions ?? 20));
                 }
 
                 board.updatedBy = agent;

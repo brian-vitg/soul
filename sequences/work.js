@@ -7,8 +7,8 @@ const { SoulEngine } = require('../lib/soul-engine');
 // In-memory work session state per project
 const activeSessions = {};
 
-// TTL: auto-expire stale sessions (24 hours, checked every hour)
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+// TTL: auto-expire stale sessions (checked every hour)
+const SESSION_TTL_MS = (require('../lib/config').WORK?.sessionTtlHours ?? 24) * 60 * 60 * 1000;
 const _sessionGcTimer = setInterval(() => {
     const now = Date.now();
     for (const [project, session] of Object.entries(activeSessions)) {

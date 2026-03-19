@@ -1,5 +1,6 @@
-// Soul MCP v6.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
+// Soul MCP — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
 const path = require('path');
+const pkg = require('../package.json');
 const fs = require('fs');
 const { readJson, today, nowISO, logError } = require('../lib/utils');
 const { detectAgentsDir, listAgents } = require('../lib/agent-registry');
@@ -32,7 +33,7 @@ function registerBootSequence(server, z, config) {
             const agentName = agent || process.env.N2_AGENT_NAME || 'default';
             setAgentName(agentName);
 
-            lines.push(`--- Soul Boot v6.0 | ${agentName} | ${today()} ---`);
+            lines.push(`--- Soul Boot v${pkg.version} | ${agentName} | ${today()} ---`);
             if (agents.length > 0) {
                 lines.push(`Agents: ${agents.map(a => `${a.name}[${a.model}]`).join(', ')}`);
             }
@@ -114,7 +115,7 @@ function registerBootSequence(server, z, config) {
                 lines.push(`⚠️ Core Memory: ${e.message}`);
             }
 
-            lines.push(`\n--- Soul Boot v6.0 complete ---`);
+            lines.push(`\n--- Soul Boot v${pkg.version} complete ---`);
             return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
     );

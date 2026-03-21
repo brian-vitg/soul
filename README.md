@@ -554,7 +554,17 @@ AI agents waste massive tokens reading irrelevant code:
 |----------|:----------:|:---------:|
 | **Paste entire file** | 10,000+ | ~20% relevant |
 | **Dump whole project** | 500,000+ | ~5% relevant |
-| **Arachne** | ~30,000 | **~90% relevant** |
+| **Arachne** | ~14,000 | **~90% relevant** |
+
+### Real-World Benchmark (N2 Browser Project)
+
+| Metric | Value |
+|--------|:-----:|
+| **Project size** | 3,219 files, 4.68M tokens |
+| **Arachne output** | 14,074 tokens |
+| **Compression** | **333x** (99.7% reduction) |
+| **Index time** | 627ms (incremental: 0ms) |
+| **DB size** | 24 MB |
 
 ### How Arachne Works
 

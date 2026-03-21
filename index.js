@@ -39,23 +39,32 @@ const ark = createArk({
     auditEnabled: true,
 });
 
-const _origRegisterTool = server.registerTool.bind(server);
+// Ark-wrapped registerTool shim — bridges legacy registerTool() to SDK v1.6.1 server.tool()
+const _origTool = server.tool.bind(server);
+const _arkWrap = (name, handler) => async (args) => {
+    const content = JSON.stringify(args);
+    const result = ark.check(name, content, 'tool_call');
+    if (!result.allowed) {
+        return {
+            content: [{
+                type: 'text',
+                text: `[n2-ark] BLOCKED: ${result.reason}\n` +
+                      `Rule: ${result.rule} | Action: ${result.action}\n` +
+                      `This action requires human approval.`,
+            }],
+        };
+    }
+    return handler(args);
+};
+// Shim: server.registerTool(name, {title, description, inputSchema}, handler) → server.tool()
 server.registerTool = (name, schema, handler) => {
-    _origRegisterTool(name, schema, async (args) => {
-        const content = JSON.stringify(args);
-        const result = ark.check(name, content, 'tool_call');
-        if (!result.allowed) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `[n2-ark] BLOCKED: ${result.reason}\n` +
-                          `Rule: ${result.rule} | Action: ${result.action}\n` +
-                          `This action requires human approval.`,
-                }],
-            };
-        }
-        return handler(args);
-    });
+    const desc = schema.description || schema.title || name;
+    _origTool(name, desc, schema.inputSchema || {}, _arkWrap(name, handler));
+};
+// Override: server.tool() with Ark check (for files using new API directly, e.g. arachne.js)
+server.tool = (name, ...rest) => {
+    const handler = rest.pop();
+    _origTool(name, ...rest, _arkWrap(name, handler));
 };
 // ═══ End Ark ═══
 

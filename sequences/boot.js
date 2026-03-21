@@ -9,7 +9,7 @@ const { setAgentName, setKvChainParent } = require('../lib/context');
 const { EntityMemory } = require('../lib/entity-memory');
 const { CoreMemory } = require('../lib/core-memory');
 
-function registerBootSequence(server, z, config, ark = null) {
+function registerBootSequence(server, z, config) {
     const engine = new SoulEngine(config.DATA_DIR);
     const entityMemory = new EntityMemory(config.DATA_DIR);
     const coreMemory = new CoreMemory(config.DATA_DIR);
@@ -26,13 +26,6 @@ function registerBootSequence(server, z, config, ark = null) {
         },
         async ({ agent, project }) => {
             const lines = [];
-
-            // -- Reset Ark state machine on every boot --
-            // Prevents deadlock when previous session didn't call n2_work_end
-            if (ark && typeof ark.reset === 'function') {
-                ark.reset();
-                lines.push('Ark: State machine reset — clean session');
-            }
 
             // -- Agent resolution --
             const agentsDir = config.AGENTS_DIR || detectAgentsDir();

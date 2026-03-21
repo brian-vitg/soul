@@ -307,6 +307,20 @@ DATA_DIR: '\\\\server\\team\\n2-soul'    DATA_DIR: '\\\\server\\team\\n2-soul'
 
 Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, brain memory. Any sync service that mirrors folders (Google Drive, OneDrive, Dropbox, Syncthing, rsync) works perfectly because there's nothing to integrate. No database migrations, no API versions, no SDK updates. Just files.
 
+## 🧹 Storage Management & Garbage Collection
+
+As agents run hundreds of sessions, file count inevitably grows. Soul handles this infinite growth gracefully:
+
+### 1. KV-Cache Garbage Collection (`n2_kv_gc`)
+Soul includes a built-in `n2_kv_gc` tool that automatically cleans up old KV-Cache snapshots. 
+Set `maxAgeDays` in your config, and Soul will autonomously delete stale session data while preserving recent history.
+
+### 2. Time-Partitioned Ledger
+The immutable work ledger isn't a single massive database file. It's partitioned by date (`ledger/YYYY/MM/DD/`). 
+Want to archive 2025's logs? Just zip the `2025` folder. Want to delete logs older than 6 months? Just delete the old folders. Zero database corruption risk.
+
+### 3. OS-Level Sovereignty
+Because Soul's "cloud" is just your local filesystem mapped to a sync drive, you can use standard OS tools (cron jobs, Windows Task Scheduler, bash scripts) to enforce retention policies. If you delete a project folder, the project is gone. No dangling DB rows.
 
 ## Ark — The Last Shield
 

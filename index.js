@@ -77,13 +77,8 @@ async function boot() {
     if (config.ARACHNE?.projectDir) {
         try {
             const arachne = await createArachne({
+                ...config.ARACHNE,
                 dataDir: config.ARACHNE.dataDir ?? path.join(config.DATA_DIR, 'arachne'),
-                projectDir: config.ARACHNE.projectDir,
-                indexing: config.ARACHNE.indexing ?? { autoIndex: true },
-                search: config.ARACHNE.search ?? {},
-                assembly: config.ARACHNE.assembly ?? {},
-                backup: config.ARACHNE.backup ?? {},
-                embedding: config.ARACHNE.embedding ?? {},
             });
             registerArachneTools(server, z, arachne, config);
             console.error(`[n2-soul] Arachne enabled: ${config.ARACHNE.projectDir}`);

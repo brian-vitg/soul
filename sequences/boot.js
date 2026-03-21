@@ -9,7 +9,7 @@ const { setAgentName, setKvChainParent } = require('../lib/context');
 const { EntityMemory } = require('../lib/entity-memory');
 const { CoreMemory } = require('../lib/core-memory');
 
-function registerBootSequence(server, z, config) {
+function registerBootSequence(server, z, config, workflows = {}) {
     const engine = new SoulEngine(config.DATA_DIR);
     const entityMemory = new EntityMemory(config.DATA_DIR);
     const coreMemory = new CoreMemory(config.DATA_DIR);
@@ -113,6 +113,22 @@ function registerBootSequence(server, z, config) {
             } catch (e) {
                 logError('boot:core-memory', e);
                 lines.push(`⚠️ Core Memory: ${e.message}`);
+            }
+
+            // -- Workflow auto-injection: session_start triggers --
+            const bootWorkflows = Object.values(workflows).filter(
+                w => w.trigger === 'session_start'
+            );
+            if (bootWorkflows.length > 0) {
+                lines.push('\n═══ MANDATORY BOOT STEPS (auto-injected by @workflow) ═══');
+                for (const wf of bootWorkflows) {
+                    const requiredSteps = wf.steps.filter(s => s.required);
+                    for (const step of requiredSteps) {
+                        lines.push(`⚠️ REQUIRED: ${step.action || step.name}`);
+                    }
+                }
+                lines.push('You MUST execute ALL required steps above before proceeding.');
+                lines.push('═════════════════════════════════════════════════════');
             }
 
             lines.push(`\n--- Soul Boot v${pkg.version} complete ---`);

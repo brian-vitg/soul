@@ -547,7 +547,7 @@ Soul is free and open-source. These amazing people help keep it alive:
 
 ## Star History
 
-If you find Soul helpful, please consider giving us a star! ⭐
+No coffee? A star is fine too ☕→⭐
 
 ---
 

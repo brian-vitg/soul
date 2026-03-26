@@ -1,6 +1,6 @@
-🇰🇷 [한국어](README.ko.md)
+한국어](README.ko.md)
 
-# 🧠 Soul
+# Soul
 
 [![npm version](https://img.shields.io/npm/v/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -12,17 +12,17 @@
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
 
-- 🧠 **Persistent memory** that survives across sessions
-- 🤝 **Handoffs** so one agent can pick up where another left off
-- 📝 **Work history** recorded as an immutable log
-- 🗂️ **Shared brain** so multiple agents can read/write the same context
-- 🏷️ **Entity Memory** — auto-tracks people, hardware, projects
-- 💡 **Core Memory** — agent-specific always-loaded facts
+- **Persistent memory** that survives across sessions
+- **Handoffs** so one agent can pick up where another left off
+- **Work history** recorded as an immutable log
+- **Shared brain** so multiple agents can read/write the same context
+- **Entity Memory** — auto-tracks people, hardware, projects
+- **Core Memory** — agent-specific always-loaded facts
 
-> 🔌 **Works great with the N2 ecosystem:**
+> **Works great with the N2 ecosystem:**
 > [**Ark**](https://github.com/choihyunsus/n2-ark) (AI safety) · [**Arachne**](https://github.com/choihyunsus/n2-arachne) (code context) · [**QLN**](https://github.com/choihyunsus/n2-QLN) (tool routing)
 
-> ⚡ **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
+> **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Quick Start](#quick-start)
 - [Why Soul?](#why-soul)
 - [Features](#features)
-- [Cloud Storage](#️-cloud-storage--store-your-ai-memory-anywhere)
+- [Cloud Storage](#-cloud-storage--store-your-ai-memory-anywhere)
 - [Available Tools](#available-tools)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
@@ -40,21 +40,21 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 
 > **Strict TypeScript — Zero `any`, zero memory leaks, automated quality enforcement.**
 
-### 🔒 Full TypeScript Strict Mode
+### Full TypeScript Strict Mode
 
 - Source code migrated to TypeScript with `strict: true`
 - **Zero `any`** — every type is explicit and verifiable
 - ESLint `strictTypeChecked` rules catch floating promises, type safety violations
 - 30 unit tests with `npm run verify` one-command pipeline
 
-### 🛡️ Security & Memory Audit
+### Security & Memory Audit
 
 - WASM memory leak fix — `stmt.free()` wrapped in `try/finally`
 - Silent error swallowing eliminated — all `.catch()` handlers log errors
 - HTTP response size limits for embedding requests
 - `dispose()` methods for proper timer cleanup
 
-### 🧠 v8.0 Features (Included)
+### v8.0 Features (Included)
 
 - **Forgetting Curve GC** — intelligent memory retention based on access patterns
 - **Async I/O** — non-blocking operations, 42% faster KV load
@@ -90,18 +90,18 @@ Soul is a standard MCP server (stdio). Add it to your host's config:
 Add to `mcp.json`, `settings.json`, or `claude_desktop_config.json`:
 ```json
 {
-  "mcpServers": {
-    "soul": {
-      "command": "node",
-      "args": ["/path/to/node_modules/n2-soul/index.js"]
-    }
-  }
+ "mcpServers": {
+ "soul": {
+ "command": "node",
+ "args": ["/path/to/node_modules/n2-soul/index.js"]
+ }
+ }
 }
 ```
 </details>
 
 <details>
-<summary><strong>🦙 Ollama + Open WebUI</strong></summary>
+<summary><strong> Ollama + Open WebUI</strong></summary>
 
 Open WebUI supports MCP tools natively.
 
@@ -119,39 +119,39 @@ echo %cd%\node_modules\n2-soul\index.js
 echo $(pwd)/node_modules/n2-soul/index.js
 ```
 
-In **Open WebUI**: Go to **⚙️ Settings → Tools → MCP Servers** → Add new server:
+In **Open WebUI**: Go to ** Settings → Tools → MCP Servers** → Add new server:
 ```
-Name:    soul
+Name: soul
 Command: node
-Args:    /your/path/to/node_modules/n2-soul/index.js
+Args: /your/path/to/node_modules/n2-soul/index.js
 ```
 
 Now any model you chat with in Open WebUI can use Soul's 20+ memory tools.
 </details>
 
 <details>
-<summary><strong>🖥️ LM Studio</strong></summary>
+<summary><strong> LM Studio</strong></summary>
 
 LM Studio supports MCP natively. Add to `~/.lmstudio/mcp.json`:
 ```json
 {
-  "mcpServers": {
-    "soul": {
-      "command": "node",
-      "args": ["/path/to/node_modules/n2-soul/index.js"]
-    }
-  }
+ "mcpServers": {
+ "soul": {
+ "command": "node",
+ "args": ["/path/to/node_modules/n2-soul/index.js"]
+ }
+ }
 }
 ```
 </details>
 
 <details>
-<summary><strong>🔧 Any other MCP-compatible host</strong></summary>
+<summary><strong> Any other MCP-compatible host</strong></summary>
 
 Soul speaks standard MCP protocol over **stdio**. If your tool supports MCP, Soul works. Just point the command to `node` and the args to `n2-soul/index.js`.
 </details>
 
-> **💡 Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
+> ** Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
 
 ### 3. Tell your agent to use Soul
 
@@ -219,27 +219,27 @@ Over 10 sessions, that's **30,000+ tokens saved** on context alone — and your 
 
 ```
 Session Start → "Boot"
-    ↓
-n2_boot(agent, project)     → Load handoff + Entity Memory + Core Memory + KV-Cache
-    ↓
+ ↓
+n2_boot(agent, project) → Load handoff + Entity Memory + Core Memory + KV-Cache
+ ↓
 n2_work_start(project, task) → Register active work
-    ↓
+ ↓
 ... your agent works normally ...
-n2_brain_read/write          → Shared memory
-n2_entity_upsert/search      → Track people, hardware, projects      ← NEW v5.0
-n2_core_read/write           → Agent-specific persistent facts       ← NEW v5.0
-n2_work_claim(file)          → Prevent file conflicts
-n2_work_log(files)           → Track changes
-    ↓
+n2_brain_read/write → Shared memory
+n2_entity_upsert/search → Track people, hardware, projects ← NEW v5.0
+n2_core_read/write → Agent-specific persistent facts ← NEW v5.0
+n2_work_claim(file) → Prevent file conflicts
+n2_work_log(files) → Track changes
+ ↓
 Session End → "End"
-    ↓
+ ↓
 n2_work_end(project, title, summary, todo, entities, insights)
-    ├→ Immutable ledger entry saved
-    ├→ Handoff updated for next agent
-    ├→ KV-Cache snapshot auto-saved
-    ├→ Entities auto-saved to Entity Memory                          ← NEW v5.0
-    ├→ Insights archived to memory                                   ← NEW v5.0
-    └→ File ownership released
+ ├→ Immutable ledger entry saved
+ ├→ Handoff updated for next agent
+ ├→ KV-Cache snapshot auto-saved
+ ├→ Entities auto-saved to Entity Memory ← NEW v5.0
+ ├→ Insights archived to memory ← NEW v5.0
+ └→ File ownership released
 ```
 
 ## Features
@@ -249,9 +249,9 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Soul Board** | Project state + TODO tracking + handoffs between agents |
 | **Immutable Ledger** | Every work session recorded as append-only log |
 | **KV-Cache** | Session snapshots with compression + tiered storage (Hot/Warm/Cold) |
-| **Forgetting Curve GC** | 🆕 v8 — Ebbinghaus-based intelligent memory retention |
-| **Async I/O** | 🆕 v8 — Non-blocking I/O on all hot-path operations |
-| **Schema v2** | 🆕 v8 — Access tracking + importance scoring + auto-migration |
+| **Forgetting Curve GC** | v8 — Ebbinghaus-based intelligent memory retention |
+| **Async I/O** | v8 — Non-blocking I/O on all hot-path operations |
+| **Schema v2** | v8 — Access tracking + importance scoring + auto-migration |
 | **Shared Brain** | File-based shared memory with path traversal protection |
 | **Entity Memory** | Auto-tracks people, hardware, projects, concepts across sessions |
 | **Core Memory** | Agent-specific always-loaded facts (identity, rules, focus) |
@@ -263,7 +263,7 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Backup/Restore** | Incremental backups with configurable retention |
 | **Cloud Storage** | Store memory anywhere — Google Drive, NAS, network server, any path |
 
-## ☁️ Cloud Storage — Store Your AI Memory Anywhere
+## Cloud Storage — Store Your AI Memory Anywhere
 
 ![Cloud Storage](docs/cloud-storage.png)
 
@@ -274,7 +274,7 @@ Soul takes a radically different approach to cloud storage:
 ```js
 // config.local.js — This is ALL you need
 module.exports = {
-    DATA_DIR: 'G:/My Drive/n2-soul',  // Google Drive
+ DATA_DIR: 'G:/My Drive/n2-soul', // Google Drive
 };
 ```
 
@@ -288,14 +288,14 @@ Soul stores everything as **plain JSON files**. Any folder that your OS can read
 
 | Storage | Example `DATA_DIR` | Cost |
 |---------|-------------------|:----:|
-| 📁 **Local** (default) | `./data` | Free |
-| ☁️ **Google Drive** | `G:/My Drive/n2-soul` | Free (15GB) |
-| ☁️ **OneDrive** | `C:/Users/you/OneDrive/n2-soul` | Free (5GB) |
-| ☁️ **Dropbox** | `C:/Users/you/Dropbox/n2-soul` | Free (2GB) |
-| 🖥️ **NAS** | `Z:/n2-soul` | Your hardware |
-| 🏢 **Company Server** | `\\\\server\\shared\\n2-soul` | Your infra |
-| 🔌 **USB Drive** | `E:/n2-soul` | $10 |
-| 🐧 **Linux (rclone)** | `~/gdrive/n2-soul` | Free |
+| **Local** (default) | `./data` | Free |
+| **Google Drive** | `G:/My Drive/n2-soul` | Free (15GB) |
+| **OneDrive** | `C:/Users/you/OneDrive/n2-soul` | Free (5GB) |
+| **Dropbox** | `C:/Users/you/Dropbox/n2-soul` | Free (2GB) |
+| **NAS** | `Z:/n2-soul` | Your hardware |
+| **Company Server** | `\\\\server\\shared\\n2-soul` | Your infra |
+| **USB Drive** | `E:/n2-soul` | $10 |
+| **Linux (rclone)** | `~/gdrive/n2-soul` | Free |
 
 ### Soul Cloud Features
 
@@ -314,8 +314,8 @@ Soul stores everything as **plain JSON files**. Any folder that your OS can read
 Point multiple agents to the **same network path** = instant shared memory:
 
 ```js
-// Team member A                         // Team member B
-DATA_DIR: '\\\\server\\team\\n2-soul'    DATA_DIR: '\\\\server\\team\\n2-soul'
+// Team member A // Team member B
+DATA_DIR: '\\\\server\\team\\n2-soul' DATA_DIR: '\\\\server\\team\\n2-soul'
 // Same project data, shared handoffs, shared brain!
 ```
 
@@ -325,11 +325,11 @@ DATA_DIR: '\\\\server\\team\\n2-soul'    DATA_DIR: '\\\\server\\team\\n2-soul'
 
 Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, brain memory. Any sync service that mirrors folders (Google Drive, OneDrive, Dropbox, Syncthing, rsync) works perfectly because there's nothing to integrate. No database migrations, no API versions, no SDK updates. Just files.
 
-## 🧹 Storage Management & Garbage Collection
+## Storage Management & Garbage Collection
 
 As agents run hundreds of sessions, file count inevitably grows. Soul handles this infinite growth gracefully:
 
-### 1. Forgetting Curve GC (`n2_kv_gc`) — 🆕 v8.0
+### 1. Forgetting Curve GC (`n2_kv_gc`) — v8.0
 
 Soul v8.0 replaces simple age-based deletion with **Ebbinghaus Forgetting Curve** scoring:
 
@@ -349,7 +349,7 @@ Want to archive 2025's logs? Just zip the `2025` folder. Want to delete logs old
 ### 3. OS-Level Sovereignty
 Because Soul's "cloud" is just your local filesystem mapped to a sync drive, you can use standard OS tools (cron jobs, Windows Task Scheduler, bash scripts) to enforce retention policies. If you delete a project folder, the project is gone. No dangling DB rows.
 
-## 🔌 N2 Ecosystem
+## N2 Ecosystem
 
 Soul works great standalone, but becomes even more powerful with the N2 ecosystem:
 
@@ -376,10 +376,10 @@ Soul works great standalone, but becomes even more powerful with the N2 ecosyste
 | `n2_work_end` | End session — writes ledger, handoff, entities, insights, KV-Cache |
 | `n2_brain_read` | Read from shared memory |
 | `n2_brain_write` | Write to shared memory |
-| `n2_entity_upsert` | 🆕 Add/update entities (auto-merge attributes) |
-| `n2_entity_search` | 🆕 Search entities by keyword or type |
-| `n2_core_read` | 🆕 Read agent-specific core memory |
-| `n2_core_write` | 🆕 Write to agent-specific core memory |
+| `n2_entity_upsert` | Add/update entities (auto-merge attributes) |
+| `n2_entity_search` | Search entities by keyword or type |
+| `n2_core_read` | Read agent-specific core memory |
+| `n2_core_write` | Write to agent-specific core memory |
 | `n2_context_search` | Search across brain + ledger |
 | `n2_kv_save` | Manually save KV-Cache snapshot |
 | `n2_kv_load` | Load most recent snapshot |
@@ -406,36 +406,36 @@ Here's what happens across 3 real sessions:
 ```
 ── Session 1 (Rose, 2pm) ──────────────────────
 n2_boot("rose", "my-app")
-  → "No previous context found. Fresh start."
+ → "No previous context found. Fresh start."
 
 ... Rose builds the auth module ...
 
 n2_work_end("rose", "my-app", {
-  title: "Built auth module",
-  summary: "JWT auth with refresh tokens",
-  todo: ["Add rate limiting", "Write tests"],
-  entities: [{ type: "service", name: "auth-api" }]
+ title: "Built auth module",
+ summary: "JWT auth with refresh tokens",
+ todo: ["Add rate limiting", "Write tests"],
+ entities: [{ type: "service", name: "auth-api" }]
 })
-  → KV-Cache saved. Ledger entry #001.
+ → KV-Cache saved. Ledger entry #001.
 
 ── Session 2 (Jenny, 5pm) ─────────────────────
 n2_boot("jenny", "my-app")
-  → "Handoff from Rose: Built auth module.
-     TODO: Add rate limiting, Write tests.
-     Entity: auth-api (service)"
+ → "Handoff from Rose: Built auth module.
+ TODO: Add rate limiting, Write tests.
+ Entity: auth-api (service)"
 
 ... Jenny adds rate limiting, knows exactly where Rose left off ...
 
 n2_work_end("jenny", "my-app", {
-  title: "Added rate limiting",
-  todo: ["Write tests"]
+ title: "Added rate limiting",
+ todo: ["Write tests"]
 })
 
 ── Session 3 (Rose, next day) ─────────────────
 n2_boot("rose", "my-app")
-  → "Handoff from Jenny: Rate limiting done.
-     TODO: Write tests.
-     2 sessions of history loaded (L1, ~500 tokens)"
+ → "Handoff from Jenny: Rate limiting done.
+ TODO: Write tests.
+ 2 sessions of history loaded (L1, ~500 tokens)"
 
 ... Rose writes tests, with full context from both sessions ...
 ```
@@ -449,29 +449,29 @@ Soul includes an optional **Rust-based compiler** for `.n2` rule files — compi
 n2c validate soul-boot.n2
 
 # Output:
-# ── Step 1: Parse ✅
+# ── Step 1: Parse 
 # ── Step 2: Schema Validation
-#   ✅ Passed! 0 errors, 0 warnings
+# Passed! 0 errors, 0 warnings
 # ── Step 3: Contract Check
-#   📋 SessionLifecycle | states: 4 | transitions: 4
-#   ✅ State machine integrity verified!
-# ✅ All checks passed!
+# SessionLifecycle | states: 4 | transitions: 4
+# State machine integrity verified!
+# All checks passed!
 ```
 
 What n2c catches at **compile time**:
-- 🔒 **Unreachable states** — states no transition can reach
-- 💀 **Deadlocks** — states with no outgoing transitions
-- ❓ **Missing references** — `depends_on` pointing to nonexistent steps
-- 🚫 **Invalid sequences** — calling `n2_work_start` before `n2_boot`
+- **Unreachable states** — states no transition can reach
+- **Deadlocks** — states with no outgoing transitions
+- **Missing references** — `depends_on` pointing to nonexistent steps
+- **Invalid sequences** — calling `n2_work_start` before `n2_boot`
 
 ```n2
 @contract SessionLifecycle {
-  transitions {
-    IDLE -> BOOTING : on n2_boot
-    BOOTING -> READY : on boot_complete
-    READY -> WORKING : on n2_work_start
-    WORKING -> IDLE : on n2_work_end
-  }
+ transitions {
+ IDLE -> BOOTING : on n2_boot
+ BOOTING -> READY : on boot_complete
+ READY -> WORKING : on n2_work_start
+ WORKING -> IDLE : on n2_work_end
+ }
 }
 ```
 
@@ -488,14 +488,14 @@ cp lib/config.example.js lib/config.local.js
 ```js
 // lib/config.local.js
 module.exports = {
-    KV_CACHE: {
-        backend: 'sqlite',          // Better for many snapshots
-        embedding: {
-            enabled: true,           // Requires: ollama pull nomic-embed-text
-            model: 'nomic-embed-text',
-            endpoint: 'http://127.0.0.1:11434',
-        },
-    },
+ KV_CACHE: {
+ backend: 'sqlite', // Better for many snapshots
+ embedding: {
+ enabled: true, // Requires: ollama pull nomic-embed-text
+ model: 'nomic-embed-text',
+ endpoint: 'http://127.0.0.1:11434',
+ },
+ },
 };
 ```
 
@@ -506,39 +506,39 @@ All runtime data is stored in `data/` (gitignored, auto-created):
 ```
 soul/
 ├── lib/
-│   ├── config.default.js  # Default configuration
-│   ├── soul-engine.js     # Core Soul engine
-│   ├── core-memory.js     # Core Memory (per-agent facts)
-│   ├── entity-memory.js   # Entity Memory (auto-tracked)
-│   ├── intercom-log.js    # Inter-agent communication logs
-│   ├── kv-cache/          # KV-Cache backend
-│   └── utils.js           # Shared utilities
+│ ├── config.default.js # Default configuration
+│ ├── soul-engine.js # Core Soul engine
+│ ├── core-memory.js # Core Memory (per-agent facts)
+│ ├── entity-memory.js # Entity Memory (auto-tracked)
+│ ├── intercom-log.js # Inter-agent communication logs
+│ ├── kv-cache/ # KV-Cache backend
+│ └── utils.js # Shared utilities
 ├── tools/
-│   ├── brain.js           # Brain read/write tools
-│   └── kv-cache.js        # KV-Cache tools
+│ ├── brain.js # Brain read/write tools
+│ └── kv-cache.js # KV-Cache tools
 ├── sequences/
-│   ├── boot.js            # Boot sequence
-│   ├── work.js            # Work sequence
-│   └── end.js             # End sequence
+│ ├── boot.js # Boot sequence
+│ ├── work.js # Work sequence
+│ └── end.js # End sequence
 ├── data/
-│   ├── memory/         # Shared brain (n2_brain_read/write)
-│   │   ├── entities.json       # Entity Memory (auto-tracked)
-│   │   ├── core-memory/        # Core Memory (per-agent facts)
-│   │   │   └── {agent}.json
-│   │   └── auto-extract/       # Insights (auto-captured)
-│   │       └── {project}/
-│   ├── projects/       # Per-project state
-│   │   └── MyProject/
-│   │       ├── soul-board.json    # Current state + handoff
-│   │       ├── file-index.json    # File tree snapshot
-│   │       └── ledger/            # Immutable work logs
-│   │           └── 2026/03/09/
-│   │               └── 001-agent.json
-│   └── kv-cache/       # Session snapshots
-│       ├── snapshots/  # JSON backend
-│       ├── sqlite/     # SQLite backend
-│       ├── embeddings/ # Ollama vectors
-│       └── backups/    # Portable backups
+│ ├── memory/ # Shared brain (n2_brain_read/write)
+│ │ ├── entities.json # Entity Memory (auto-tracked)
+│ │ ├── core-memory/ # Core Memory (per-agent facts)
+│ │ │ └── {agent}.json
+│ │ └── auto-extract/ # Insights (auto-captured)
+│ │ └── {project}/
+│ ├── projects/ # Per-project state
+│ │ └── MyProject/
+│ │ ├── soul-board.json # Current state + handoff
+│ │ ├── file-index.json # File tree snapshot
+│ │ └── ledger/ # Immutable work logs
+│ │ └── 2026/03/09/
+│ │ └── 001-agent.json
+│ └── kv-cache/ # Session snapshots
+│ ├── snapshots/ # JSON backend
+│ ├── sqlite/ # SQLite backend
+│ ├── embeddings/ # Ollama vectors
+│ └── backups/ # Portable backups
 ```
 
 ## Dependencies
@@ -564,32 +564,16 @@ Contributions are welcome! Here's how to get started:
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-## 💖 Sponsors
 
-Soul is free and open-source. These amazing people help keep it alive:
-
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/sunir">
-        <img src="https://github.com/sunir.png" width="80" height="80" style="border-radius:50%;" alt="Sunir Shah" /><br />
-        <sub><b>Sunir Shah</b></sub>
-      </a><br />
-      <sub>🥇 First Sponsor</sub>
-    </td>
-  </tr>
-</table>
-
-> Become a sponsor → [GitHub Sponsors](https://github.com/sponsors/choihyunsus)
 
 ## Star History
 
-No coffee? A star is fine too ☕→⭐
+No coffee? A star is fine too →⭐
 
 ---
 
 > *"I built Soul because it broke my heart watching my agents lose their memory every session."*
 
-🌐 [nton2.com](https://nton2.com) · 📦 [npm](https://www.npmjs.com/package/n2-soul) · ✉️ lagi0730@gmail.com
+nton2.com](https://nton2.com) · [npm](https://www.npmjs.com/package/n2-soul) · lagi0730@gmail.com
 
-<sub>👋 Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>
+<sub> Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>

@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
+[![v8.0.0](https://img.shields.io/badge/v8.0.0-Forgetting%20Curve-blueviolet.svg)](#whats-new-in-v80)
 
 **Your AI agent forgets everything when a session ends. Soul fixes that.**
 
@@ -25,6 +26,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 
 ## Table of Contents
 
+- [What's New in v8.0](#whats-new-in-v80)
 - [Quick Start](#quick-start)
 - [Why Soul?](#why-soul)
 - [Token Efficiency](#token-efficiency)
@@ -38,6 +40,61 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [N2 Ecosystem](#-n2-ecosystem)
 - [Contributing](#contributing)
 - [Sponsors](#-sponsors)
+
+## What's New in v8.0
+
+> **Forgetting Curve — Soul now remembers what matters and forgets what doesn't.**
+
+### 🧠 Intelligent Memory (Forgetting Curve GC)
+
+Inspired by Ebbinghaus' forgetting curve, Soul v8.0 intelligently manages memory retention:
+
+```
+retention = importance × (1 + log₂(1 + accessCount)) × e^(−λ × ageDays)
+```
+
+- **Frequently accessed** sessions are kept longer
+- **Important** snapshots resist decay
+- **Stale** memory is automatically pruned via 3-tier lifecycle:
+
+| Tier | Age | Storage |
+|------|-----|--------|
+| 🔴 Hot | 0–7 days | In-memory cache + disk |
+| 🟡 Warm | 8–30 days | Disk only |
+| 🔵 Cold | 30+ days | Archived (compressed) |
+
+### ⚡ Performance Revolution — Async I/O
+
+All hot-path I/O operations are now fully asynchronous:
+
+| Operation | v7 (sync) | v8 (async) | Improvement |
+|-----------|-----------|------------|-------------|
+| KV Save | Blocks event loop | Non-blocking | ∞ (no block) |
+| KV Load | 1.2ms (blocking) | 0.7ms (async) | 42% faster |
+| KV Search | Blocks | Parallel | 3x+ throughput |
+| GC | Blocks during sweep | Background | Non-disruptive |
+
+### 🔧 SDK Native Migration
+
+- Removed legacy `registerTool` shim → direct `server.tool()` API
+- Strict schema validation: `z.any()` eliminated from all tool definitions
+- Full MCP SDK v1.6.1 compatibility
+
+### 📦 Schema v2 (Backward Compatible)
+
+Snapshots now include Forgetting Curve metadata. Existing v1 snapshots are **auto-migrated** on first load:
+
+```diff
++ accessCount: 0        // How often this snapshot was accessed
++ lastAccessed: null     // When it was last loaded
++ importance: 0.5        // 0.0–1.0 importance score
++ tier: 'warm'           // hot / warm / cold
+```
+
+> [!NOTE]
+> **Upgrading from v7.x**: Zero breaking changes. All existing data works as-is. Snapshots are transparently migrated to schema v2 on first access.
+
+---
 
 ## Quick Start
 
@@ -224,10 +281,13 @@ n2_work_end(project, title, summary, todo, entities, insights)
 | **Soul Board** | Project state + TODO tracking + handoffs between agents |
 | **Immutable Ledger** | Every work session recorded as append-only log |
 | **KV-Cache** | Session snapshots with compression + tiered storage (Hot/Warm/Cold) |
+| **Forgetting Curve GC** | 🆕 v8 — Ebbinghaus-based intelligent memory retention |
+| **Async I/O** | 🆕 v8 — Non-blocking I/O on all hot-path operations |
+| **Schema v2** | 🆕 v8 — Access tracking + importance scoring + auto-migration |
 | **Shared Brain** | File-based shared memory with path traversal protection |
-| **Entity Memory** | 🆕 Auto-tracks people, hardware, projects, concepts across sessions |
-| **Core Memory** | 🆕 Agent-specific always-loaded facts (identity, rules, focus) |
-| **Autonomous Extraction** | 🆕 Auto-saves entities and insights at session end |
+| **Entity Memory** | Auto-tracks people, hardware, projects, concepts across sessions |
+| **Core Memory** | Agent-specific always-loaded facts (identity, rules, focus) |
+| **Autonomous Extraction** | Auto-saves entities and insights at session end |
 | **Context Search** | Keyword search across brain memory and ledger |
 | **File Ownership** | Prevents multi-agent file editing collisions |
 | **Dual Backend** | JSON (zero deps) or SQLite for performance |
@@ -301,9 +361,18 @@ Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, 
 
 As agents run hundreds of sessions, file count inevitably grows. Soul handles this infinite growth gracefully:
 
-### 1. KV-Cache Garbage Collection (`n2_kv_gc`)
-Soul includes a built-in `n2_kv_gc` tool that automatically cleans up old KV-Cache snapshots. 
-Set `maxAgeDays` in your config, and Soul will autonomously delete stale session data while preserving recent history.
+### 1. Forgetting Curve GC (`n2_kv_gc`) — 🆕 v8.0
+
+Soul v8.0 replaces simple age-based deletion with **Ebbinghaus Forgetting Curve** scoring:
+
+```
+retention = importance × (1 + log₂(1 + accessCount)) × e^(−0.05 × ageDays)
+```
+
+- Snapshots with high `importance` or frequent `accessCount` survive longer
+- Snapshots decay naturally over time (λ = 0.05)
+- Retention threshold: 0.1 (below this → eligible for deletion)
+- `n2_kv_gc` reports retention scores so you can monitor memory health
 
 ### 2. Time-Partitioned Ledger
 The immutable work ledger isn't a single massive database file. It's partitioned by date (`ledger/YYYY/MM/DD/`). 

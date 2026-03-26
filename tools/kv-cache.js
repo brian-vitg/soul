@@ -1,8 +1,8 @@
-// Soul KV-Cache — MCP tool registration. Exposes KV-Cache to agents.
+// Soul KV-Cache v8.0 — MCP tool registration. Exposes KV-Cache to agents.
 const { SoulKVCache } = require('../lib/kv-cache');
 
 /**
- * Registers KV-Cache MCP tools.
+ * Registers KV-Cache MCP tools using SDK-native server.tool() API.
  * @param {object} server - MCP server
  * @param {object} z - Zod validator
  * @param {object} config - Soul config
@@ -13,35 +13,32 @@ function registerKVCacheTools(server, z, config) {
     const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
 
     // n2_kv_save — Save session snapshot
-    server.registerTool(
+    server.tool(
         'n2_kv_save',
+        'Save current session as a KV-Cache snapshot. Auto-called at n2_work_end if enabled.',
         {
-            title: 'N2 KV Save',
-            description: 'Save current session as a KV-Cache snapshot. Auto-called at n2_work_end if enabled.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-                project: z.string().describe('Project name'),
-                summary: z.string().describe('Session summary'),
-                decisions: z.array(z.string()).optional().describe('Key decisions made'),
-                todo: z.array(z.string()).optional().describe('TODO items for next session'),
-                filesCreated: z.array(z.object({
-                    path: z.string(), desc: z.string(),
-                })).optional().describe('Files created'),
-                filesModified: z.array(z.object({
-                    path: z.string(), desc: z.string(),
-                })).optional().describe('Files modified'),
-            },
+            agent: z.string().describe('Agent name'),
+            project: z.string().describe('Project name'),
+            summary: z.string().describe('Session summary'),
+            decisions: z.array(z.string()).optional().describe('Key decisions made'),
+            todo: z.array(z.string()).optional().describe('TODO items for next session'),
+            filesCreated: z.array(z.object({
+                path: z.string(), desc: z.string(),
+            })).optional().describe('Files created'),
+            filesModified: z.array(z.object({
+                path: z.string(), desc: z.string(),
+            })).optional().describe('Files modified'),
         },
         async ({ agent, project, summary, decisions, todo, filesCreated, filesModified }) => {
             try {
-                const id = kvCache.save(agent, project, {
+                const id = await kvCache.save(agent, project, {
                     summary,
                     decisions: decisions || [],
                     todo: todo || [],
                     filesCreated: filesCreated || [],
                     filesModified: filesModified || [],
                 });
-                const snapCount = kvCache.listSnapshots(project).length;
+                const snapCount = (await kvCache.listSnapshots(project)).length;
                 return {
                     content: [{
                         type: 'text',
@@ -55,20 +52,17 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_load — Load most recent snapshot
-    server.registerTool(
+    server.tool(
         'n2_kv_load',
+        'Load the most recent KV-Cache snapshot for a project. Returns compressed context.',
         {
-            title: 'N2 KV Load',
-            description: 'Load the most recent KV-Cache snapshot for a project. Returns compressed context.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                budget: z.number().optional().describe('Token budget for context (default: 2000)'),
-                level: z.string().optional().describe('Progressive level: L1 (minimal), L2 (standard), L3 (full), auto (default)'),
-            },
+            project: z.string().describe('Project name'),
+            budget: z.number().optional().describe('Token budget for context (default: 2000)'),
+            level: z.string().optional().describe('Progressive level: L1 (minimal), L2 (standard), L3 (full), auto (default)'),
         },
         async ({ project, budget, level }) => {
             try {
-                const snap = kvCache.load(project, { budget, level: level || 'auto' });
+                const snap = await kvCache.load(project, { budget, level: level || 'auto' });
                 if (!snap) {
                     return { content: [{ type: 'text', text: `No KV-Cache snapshots found for ${project}.` }] };
                 }
@@ -86,16 +80,13 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_search — Search across snapshots
-    server.registerTool(
+    server.tool(
         'n2_kv_search',
+        'Search across KV-Cache snapshots for relevant past sessions.',
         {
-            title: 'N2 KV Search',
-            description: 'Search across KV-Cache snapshots for relevant past sessions.',
-            inputSchema: {
-                query: z.string().describe('Search query (keywords, space-separated)'),
-                project: z.string().describe('Project name'),
-                maxResults: z.number().optional().describe('Max results (default: 5)'),
-            },
+            query: z.string().describe('Search query (keywords, space-separated)'),
+            project: z.string().describe('Project name'),
+            maxResults: z.number().optional().describe('Max results (default: 5)'),
         },
         async ({ query, project, maxResults }) => {
             try {
@@ -122,20 +113,17 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_gc — Garbage collect old snapshots
-    server.registerTool(
+    server.tool(
         'n2_kv_gc',
+        'Remove old KV-Cache snapshots. Uses config defaults if no args.',
         {
-            title: 'N2 KV Garbage Collect',
-            description: 'Remove old KV-Cache snapshots. Uses config defaults if no args.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                maxAgeDays: z.number().optional().describe('Delete older than N days'),
-            },
+            project: z.string().describe('Project name'),
+            maxAgeDays: z.number().optional().describe('Delete older than N days'),
         },
         async ({ project, maxAgeDays }) => {
             try {
-                const result = kvCache.gc(project, maxAgeDays);
-                const remaining = kvCache.listSnapshots(project).length;
+                const result = await kvCache.gc(project, maxAgeDays);
+                const remaining = (await kvCache.listSnapshots(project)).length;
                 return {
                     content: [{
                         type: 'text',
@@ -149,15 +137,12 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_backup — Backup project data
-    server.registerTool(
+    server.tool(
         'n2_kv_backup',
+        'Backup KV-Cache data to a portable SQLite DB. Supports incremental backups.',
         {
-            title: 'N2 KV Backup',
-            description: 'Backup KV-Cache data to a portable SQLite DB. Supports incremental backups.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                full: z.boolean().optional().describe('Force full backup (ignore incremental)'),
-            },
+            project: z.string().describe('Project name'),
+            full: z.boolean().optional().describe('Force full backup (ignore incremental)'),
         },
         async ({ project, full }) => {
             try {
@@ -181,16 +166,13 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_restore — Restore from backup
-    server.registerTool(
+    server.tool(
         'n2_kv_restore',
+        'Restore KV-Cache data from a backup DB.',
         {
-            title: 'N2 KV Restore',
-            description: 'Restore KV-Cache data from a backup DB.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                backupId: z.string().optional().describe('Backup ID (default: latest)'),
-                target: z.string().optional().describe('Restore target: json (default) or sqlite'),
-            },
+            project: z.string().describe('Project name'),
+            backupId: z.string().optional().describe('Backup ID (default: latest)'),
+            target: z.string().optional().describe('Restore target: json (default) or sqlite'),
         },
         async ({ project, backupId, target }) => {
             try {
@@ -211,14 +193,11 @@ function registerKVCacheTools(server, z, config) {
     );
 
     // n2_kv_backup_list — List backup history
-    server.registerTool(
+    server.tool(
         'n2_kv_backup_list',
+        'List KV-Cache backup history for a project.',
         {
-            title: 'N2 KV Backup List',
-            description: 'List KV-Cache backup history for a project.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-            },
+            project: z.string().describe('Project name'),
         },
         async ({ project }) => {
             try {

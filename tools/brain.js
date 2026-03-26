@@ -1,4 +1,4 @@
-// Soul MCP v6.0 — Brain tools. Shared memory + Entity Memory + Core Memory.
+// Soul MCP v8.0 — Brain tools. Shared memory + Entity Memory + Core Memory.
 const path = require('path');
 const { readFile, writeFile, safePath } = require('../lib/utils');
 const { EntityMemory } = require('../lib/entity-memory');
@@ -11,14 +11,11 @@ function registerBrainTools(server, z, config) {
 
     // ── Brain Read/Write ──
 
-    server.registerTool(
+    server.tool(
         'n2_brain_read',
+        'Read a file from shared memory (data/memory/). Agents share information here.',
         {
-            title: 'N2 Brain Read',
-            description: 'Read a file from shared memory (data/memory/). Agents share information here.',
-            inputSchema: {
-                filename: z.string().describe('File path relative to memory directory'),
-            },
+            filename: z.string().describe('File path relative to memory directory'),
         },
         async ({ filename }) => {
             const filePath = safePath(filename, memoryDir);
@@ -29,15 +26,12 @@ function registerBrainTools(server, z, config) {
         }
     );
 
-    server.registerTool(
+    server.tool(
         'n2_brain_write',
+        'Write a file to shared memory (data/memory/). Share information between agents.',
         {
-            title: 'N2 Brain Write',
-            description: 'Write a file to shared memory (data/memory/). Share information between agents.',
-            inputSchema: {
-                filename: z.string().describe('File path relative to memory directory'),
-                content: z.string().describe('File content'),
-            },
+            filename: z.string().describe('File path relative to memory directory'),
+            content: z.string().describe('File content'),
         },
         async ({ filename, content }) => {
             const filePath = safePath(filename, memoryDir);
@@ -49,18 +43,15 @@ function registerBrainTools(server, z, config) {
 
     // ── Entity Memory ──
 
-    server.registerTool(
+    server.tool(
         'n2_entity_upsert',
+        'Add or update entities (person, hardware, project, concept). Auto-merges attributes if entity exists.',
         {
-            title: 'N2 Entity Upsert',
-            description: 'Add or update entities (person, hardware, project, concept). Auto-merges attributes if entity exists.',
-            inputSchema: {
-                entities: z.array(z.object({
-                    type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
-                    name: z.string().describe('Entity name'),
-                    attributes: z.record(z.any()).optional().describe('Key-value attributes'),
-                })).describe('Entities to upsert'),
-            },
+            entities: z.array(z.object({
+                type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
+                name: z.string().describe('Entity name'),
+                attributes: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Key-value attributes'),
+            })).describe('Entities to upsert'),
         },
         async ({ entities }) => {
             const result = entityMemory.upsertBatch(entities);
@@ -68,15 +59,12 @@ function registerBrainTools(server, z, config) {
         }
     );
 
-    server.registerTool(
+    server.tool(
         'n2_entity_search',
+        'Search entities by keyword or type. Returns matching entities with attributes.',
         {
-            title: 'N2 Entity Search',
-            description: 'Search entities by keyword or type. Returns matching entities with attributes.',
-            inputSchema: {
-                query: z.string().optional().describe('Search keyword'),
-                type: z.string().optional().describe('Filter by type: person, hardware, project, concept, place, service'),
-            },
+            query: z.string().optional().describe('Search keyword'),
+            type: z.string().optional().describe('Filter by type: person, hardware, project, concept, place, service'),
         },
         async ({ query, type }) => {
             let results;
@@ -99,14 +87,11 @@ function registerBrainTools(server, z, config) {
 
     // ── Core Memory ──
 
-    server.registerTool(
+    server.tool(
         'n2_core_read',
+        'Read agent-specific core memory. Core memory is always loaded at boot for context injection.',
         {
-            title: 'N2 Core Read',
-            description: 'Read agent-specific core memory. Core memory is always loaded at boot for context injection.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-            },
+            agent: z.string().describe('Agent name'),
         },
         async ({ agent }) => {
             const data = coreMemory.read(agent);
@@ -119,16 +104,13 @@ function registerBrainTools(server, z, config) {
         }
     );
 
-    server.registerTool(
+    server.tool(
         'n2_core_write',
+        'Write to agent-specific core memory. Stored permanently, injected at every boot.',
         {
-            title: 'N2 Core Write',
-            description: 'Write to agent-specific core memory. Stored permanently, injected at every boot.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-                key: z.string().describe('Memory key (e.g. "current_focus", "working_rules")'),
-                value: z.string().describe('Memory value'),
-            },
+            agent: z.string().describe('Agent name'),
+            key: z.string().describe('Memory key (e.g. "current_focus", "working_rules")'),
+            value: z.string().describe('Memory value'),
         },
         async ({ agent, key, value }) => {
             const result = coreMemory.write(agent, key, value);

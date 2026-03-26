@@ -1,7 +1,5 @@
-// Soul MCP — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
-const path = require('path');
+// Soul MCP v8.0 — Boot sequence. Handoff + Entity/Core Memory injection + KV-Cache restore.
 const pkg = require('../package.json');
-const fs = require('fs');
 const { readJson, today, nowISO, logError } = require('../lib/utils');
 const { detectAgentsDir, listAgents } = require('../lib/agent-registry');
 const { SoulEngine } = require('../lib/soul-engine');
@@ -14,15 +12,12 @@ function registerBootSequence(server, z, config, workflows = {}) {
     const entityMemory = new EntityMemory(config.DATA_DIR);
     const coreMemory = new CoreMemory(config.DATA_DIR);
 
-    server.registerTool(
+    server.tool(
         'n2_boot',
+        'Boot sequence — loads soul-board handoff, entity/core memory, agent list, and KV-Cache context.',
         {
-            title: 'Soul Boot',
-            description: 'Boot sequence — loads soul-board handoff, entity/core memory, agent list, and KV-Cache context.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-                project: z.string().optional().describe('Project name to load context for'),
-            },
+            agent: z.string().describe('Agent name'),
+            project: z.string().optional().describe('Project name to load context for'),
         },
         async ({ agent, project }) => {
             const lines = [];
@@ -76,7 +71,7 @@ function registerBootSequence(server, z, config, workflows = {}) {
                 try {
                     const { SoulKVCache } = require('../lib/kv-cache');
                     const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
-                    const snap = kvCache.load(targetProject);
+                    const snap = await kvCache.load(targetProject);
                     if (snap) {
                         setKvChainParent(targetProject, snap.id);
                         const level = snap._level || 'auto';

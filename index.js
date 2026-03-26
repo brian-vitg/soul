@@ -1,5 +1,4 @@
-// Soul MCP v7.1 — Entry point. Multi-agent session orchestrator with KV-Cache.
-const path = require('path');
+// Soul MCP v8.0 — Entry point. Multi-agent session orchestrator with KV-Cache.
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
@@ -20,17 +19,7 @@ const server = new McpServer({
     version: pkg.version,
 });
 
-// ═══════════════════════════════════════════════════════
-// registerTool shim — bridges legacy registerTool() to SDK v1.6.1 server.tool()
-// ═══════════════════════════════════════════════════════
-const _origTool = server.tool.bind(server);
-server.registerTool = (name, schema, handler) => {
-    const desc = schema.description || schema.title || name;
-    _origTool(name, desc, schema.inputSchema || {}, handler);
-};
-// ═══ End shim ═══
-
-// Register core modules
+// Register core modules — all tools use SDK-native server.tool() directly
 registerBootSequence(server, z, config);
 registerWorkSequence(server, z, config);
 registerEndSequence(server, z, config);

@@ -1,4 +1,4 @@
-// Soul MCP v6.0 — End sequence. Ledger + board handoff + KV-Cache + entities/insights auto-save.
+// Soul MCP v8.0 — End sequence. Ledger + board handoff + KV-Cache + entities/insights auto-save.
 const path = require('path');
 const fs = require('fs');
 const { nowISO, logError } = require('../lib/utils');
@@ -11,25 +11,22 @@ function registerEndSequence(server, z, config) {
     const engine = new SoulEngine(config.DATA_DIR);
     const entityMemory = new EntityMemory(config.DATA_DIR);
 
-    server.registerTool(
+    server.tool(
         'n2_work_end',
+        'End work sequence. Writes immutable ledger entry, updates soul-board handoff, releases file ownership.',
         {
-            title: 'Soul Work End',
-            description: 'End work sequence. Writes immutable ledger entry, updates soul-board handoff, releases file ownership.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-                project: z.string().describe('Project name'),
-                title: z.string().describe('Work title'),
-                summary: z.string().describe('Work summary'),
-                todo: z.array(z.string()).optional().describe('Next TODO items'),
-                decisions: z.array(z.string()).optional().describe('Key decisions made'),
-                entities: z.array(z.object({
-                    type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
-                    name: z.string().describe('Entity name'),
-                    attributes: z.record(z.any()).optional().describe('Key-value attributes'),
-                })).optional().describe('Entities discovered during session (auto-saved to Entity Memory)'),
-                insights: z.array(z.string()).optional().describe('Permanent knowledge/insights to remember'),
-            },
+            agent: z.string().describe('Agent name'),
+            project: z.string().describe('Project name'),
+            title: z.string().describe('Work title'),
+            summary: z.string().describe('Work summary'),
+            todo: z.array(z.string()).optional().describe('Next TODO items'),
+            decisions: z.array(z.string()).optional().describe('Key decisions made'),
+            entities: z.array(z.object({
+                type: z.string().describe('Entity type: person, hardware, project, concept, place, service'),
+                name: z.string().describe('Entity name'),
+                attributes: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Key-value attributes'),
+            })).optional().describe('Entities discovered during session (auto-saved to Entity Memory)'),
+            insights: z.array(z.string()).optional().describe('Permanent knowledge/insights to remember'),
         },
         async ({ agent, project, title, summary, todo, decisions, entities, insights }) => {
             const session = activeSessions[project] || {};
@@ -102,7 +99,7 @@ function registerEndSequence(server, z, config) {
                     const { SoulKVCache } = require('../lib/kv-cache');
                     const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
                     const parentId = popKvChainParent(project);
-                    kvCache.save(agent, project, {
+                    await kvCache.save(agent, project, {
                         summary,
                         decisions: allDecisions,
                         todo: todo || [],
@@ -120,8 +117,7 @@ function registerEndSequence(server, z, config) {
             // 8. Auto-save entities to Entity Memory
             if (entities && entities.length > 0) {
                 try {
-                    const result = entityMemory.upsertBatch(entities);
-                    // result logged silently
+                    entityMemory.upsertBatch(entities);
                 } catch (e) { logError('end:entity-memory', e); }
             }
 
@@ -136,7 +132,6 @@ function registerEndSequence(server, z, config) {
                     fs.appendFileSync(filePath, content + '\n', 'utf-8');
                 } catch (e) { logError('end:insights', e); }
             }
-
 
             const totalFiles = (session.filesCreated || []).length +
                 (session.filesModified || []).length +

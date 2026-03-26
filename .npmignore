@@ -1,5 +1,6 @@
 # npm 배포 시 제외할 파일
 docs/
+!docs/soul-v8-roadmap.md
 data/
 .git/
 .gitignore

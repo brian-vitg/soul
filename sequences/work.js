@@ -1,4 +1,4 @@
-// Soul MCP v6.0 — Work sequence. Real-time change tracking, file ownership, context search.
+// Soul MCP v8.0 — Work sequence. Real-time change tracking, file ownership, context search.
 const fs = require('fs');
 const path = require('path');
 const { nowISO, readJson, readFile, validateFirstLineComment, logError } = require('../lib/utils');
@@ -41,16 +41,13 @@ function registerWorkSequence(server, z, config) {
     const engine = new SoulEngine(config.DATA_DIR);
 
     // Start a work sequence
-    server.registerTool(
+    server.tool(
         'n2_work_start',
+        'Start a work sequence. Registers agent in activeWork on soul-board.',
         {
-            title: 'N2 Work Start',
-            description: 'Start a work sequence. Registers agent in activeWork on soul-board.',
-            inputSchema: {
-                agent: z.string().describe('Agent name'),
-                project: z.string().describe('Project name'),
-                task: z.string().describe('Task description'),
-            },
+            agent: z.string().describe('Agent name'),
+            project: z.string().describe('Project name'),
+            task: z.string().describe('Task description'),
         },
         async ({ agent, project, task }) => {
             engine.setActiveWork(project, agent, task, []);
@@ -69,17 +66,14 @@ function registerWorkSequence(server, z, config) {
     );
 
     // Claim file ownership before editing
-    server.registerTool(
+    server.tool(
         'n2_work_claim',
+        'Claim file ownership before modifying. Prevents collision with other agents.',
         {
-            title: 'N2 Work Claim',
-            description: 'Claim file ownership before modifying. Prevents collision with other agents.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                agent: z.string().describe('Agent name'),
-                filePath: z.string().describe('File path relative to project root'),
-                intent: z.string().describe('Why you are modifying this file'),
-            },
+            project: z.string().describe('Project name'),
+            agent: z.string().describe('Agent name'),
+            filePath: z.string().describe('File path relative to project root'),
+            intent: z.string().describe('Why you are modifying this file'),
         },
         async ({ project, agent, filePath, intent }) => {
             const result = engine.claimFile(project, filePath, agent, intent);
@@ -91,27 +85,24 @@ function registerWorkSequence(server, z, config) {
     );
 
     // Log file changes during work
-    server.registerTool(
+    server.tool(
         'n2_work_log',
+        'Log file changes during work. Reports created/modified/deleted files with descriptions.',
         {
-            title: 'N2 Work Log',
-            description: 'Log file changes during work. Reports created/modified/deleted files with descriptions.',
-            inputSchema: {
-                project: z.string().describe('Project name'),
-                filesCreated: z.array(z.object({
-                    path: z.string(),
-                    desc: z.string(),
-                })).optional().describe('Files created'),
-                filesModified: z.array(z.object({
-                    path: z.string(),
-                    desc: z.string(),
-                })).optional().describe('Files modified'),
-                filesDeleted: z.array(z.object({
-                    path: z.string(),
-                    desc: z.string(),
-                })).optional().describe('Files deleted'),
-                decisions: z.array(z.string()).optional().describe('Decisions made'),
-            },
+            project: z.string().describe('Project name'),
+            filesCreated: z.array(z.object({
+                path: z.string(),
+                desc: z.string(),
+            })).optional().describe('Files created'),
+            filesModified: z.array(z.object({
+                path: z.string(),
+                desc: z.string(),
+            })).optional().describe('Files modified'),
+            filesDeleted: z.array(z.object({
+                path: z.string(),
+                desc: z.string(),
+            })).optional().describe('Files deleted'),
+            decisions: z.array(z.string()).optional().describe('Decisions made'),
         },
         async ({ project, filesCreated, filesModified, filesDeleted, decisions }) => {
             const session = activeSessions[project];
@@ -149,16 +140,14 @@ function registerWorkSequence(server, z, config) {
     );
 
     // ── n2_context_search: Search across Brain memory and Ledger entries ──
-    server.registerTool(
+    server.tool(
         'n2_context_search',
+        'Search across Brain memory and Ledger entries for relevant past context. Uses keyword matching with recency weighting. Great for finding related past work or decisions.',
         {
-            title: 'N2 Context Search',
-            description: 'Search across Brain memory and Ledger entries for relevant past context. Uses keyword matching with recency weighting. Great for finding related past work or decisions.',
-            inputSchema: {
-                query: z.string().describe('Search query (keywords, space-separated)'),
-                sources: z.array(z.string()).optional().describe('Sources to search: "brain", "ledger". Default: all.'),
-                maxResults: z.number().optional().describe('Max results (default: 10)'),
-            },
+            query: z.string().describe('Search query (keywords, space-separated)'),
+            sources: z.array(z.string()).optional().describe('Sources to search: "brain", "ledger". Default: all.'),
+            maxResults: z.number().optional().describe('Max results (default: 10)'),
+            semantic: z.boolean().optional().describe('Enable semantic search via Ollama embeddings (default: auto from config)'),
         },
         async ({ query, sources, maxResults }) => {
             try {

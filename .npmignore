@@ -3,6 +3,10 @@ src/
 docs/
 data/
 tests/
+lib/
+sequences/
+tools/
+index.js
 .git/
 .gitignore
 .github/

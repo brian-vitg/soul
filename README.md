@@ -1,4 +1,4 @@
-한국어](README.ko.md)
+[한국어](README.ko.md)
 
 # Soul
 
@@ -8,7 +8,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/n2-soul.svg)](https://www.npmjs.com/package/n2-soul)
 [![v9.0.0](https://img.shields.io/badge/v9.0.0-Strict%20TypeScript-blueviolet.svg)](#whats-new-in-v90)
 
-**Your AI agent forgets everything when a session ends. Soul fixes that.**
+Your AI agent forgets everything when a session ends. Soul fixes that.
 
 Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compatible AI agent, it starts from zero — no memory of what it did before. Soul is an MCP server that gives your agents:
 
@@ -19,10 +19,10 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - **Entity Memory** — auto-tracks people, hardware, projects
 - **Core Memory** — agent-specific always-loaded facts
 
-> **Works great with the N2 ecosystem:**
-> [**Ark**](https://github.com/choihyunsus/n2-ark) (AI safety) · [**Arachne**](https://github.com/choihyunsus/n2-arachne) (code context) · [**QLN**](https://github.com/choihyunsus/n2-QLN) (tool routing)
+**Works great with the N2 ecosystem:**
+[**Ark**](https://github.com/choihyunsus/n2-ark) (AI safety) · [**Arachne**](https://github.com/choihyunsus/n2-arachne) (code context) · [**QLN**](https://github.com/choihyunsus/n2-QLN) (tool routing)
 
-> **Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
+**Soul is one small component of N2 Browser** — an AI-native browser we're building. Multi-agent orchestration, real-time tool routing, inter-agent communication, and much more are currently in testing. This is just the beginning.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - [Quick Start](#quick-start)
 - [Why Soul?](#why-soul)
 - [Features](#features)
-- [Cloud Storage](#-cloud-storage--store-your-ai-memory-anywhere)
+- [Cloud Storage](#cloud-storage--store-your-ai-memory-anywhere)
 - [Available Tools](#available-tools)
 - [Configuration](#configuration)
 - [Contributing](#contributing)
@@ -38,7 +38,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 
 ## What's New in v9.0
 
-> **Strict TypeScript — Zero `any`, zero memory leaks, automated quality enforcement.**
+**Strict TypeScript — Zero `any`, zero memory leaks, automated quality enforcement.**
 
 ### Full TypeScript Strict Mode
 
@@ -60,7 +60,7 @@ Every time you start a new chat with Cursor, VS Code Copilot, or any MCP-compati
 - **Async I/O** — non-blocking operations, 42% faster KV load
 - **3-tier memory** — Hot → Warm → Cold lifecycle
 
-> See [CHANGELOG.md](CHANGELOG.md) for full version history.
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
 ---
 
@@ -101,7 +101,7 @@ Add to `mcp.json`, `settings.json`, or `claude_desktop_config.json`:
 </details>
 
 <details>
-<summary><strong> Ollama + Open WebUI</strong></summary>
+<summary><strong>Ollama + Open WebUI</strong></summary>
 
 Open WebUI supports MCP tools natively.
 
@@ -119,7 +119,7 @@ echo %cd%\node_modules\n2-soul\index.js
 echo $(pwd)/node_modules/n2-soul/index.js
 ```
 
-In **Open WebUI**: Go to ** Settings → Tools → MCP Servers** → Add new server:
+In **Open WebUI**: Go to **Settings → Tools → MCP Servers** → Add new server:
 ```
 Name: soul
 Command: node
@@ -130,7 +130,7 @@ Now any model you chat with in Open WebUI can use Soul's 20+ memory tools.
 </details>
 
 <details>
-<summary><strong> LM Studio</strong></summary>
+<summary><strong>LM Studio</strong></summary>
 
 LM Studio supports MCP natively. Add to `~/.lmstudio/mcp.json`:
 ```json
@@ -146,12 +146,12 @@ LM Studio supports MCP natively. Add to `~/.lmstudio/mcp.json`:
 </details>
 
 <details>
-<summary><strong> Any other MCP-compatible host</strong></summary>
+<summary><strong>Any other MCP-compatible host</strong></summary>
 
 Soul speaks standard MCP protocol over **stdio**. If your tool supports MCP, Soul works. Just point the command to `node` and the args to `n2-soul/index.js`.
 </details>
 
-> ** Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
+**Tip:** If you installed via npm, the path is `node_modules/n2-soul/index.js`. If from source, use the absolute path to your cloned directory.
 
 ### 3. Tell your agent to use Soul
 
@@ -198,7 +198,7 @@ Next session, your agent picks up exactly where it left off — like it never fo
 | **Token control** | Progressive L1/L2/L3 (~500 tokens min) |
 | **Dependencies** | 3 packages |
 
-> **Key difference**: Soul is *deterministic* — the code forces saves and loads. The LLM does not decide what to remember, preventing accidental "forgetting".
+**Key difference**: Soul is *deterministic* — the code forces saves and loads. The LLM does not decide what to remember, preventing accidental "forgetting".
 
 ## Token Efficiency
 
@@ -214,8 +214,6 @@ Soul dramatically reduces token waste from context re-explanation:
 Over 10 sessions, that's **30,000+ tokens saved** on context alone — and your agent starts with *better* context than a manual recap.
 
 ## How It Works
-
-![Soul v5.0 Architecture](docs/soul-v5-diagram.png)
 
 ```
 Session Start → "Boot"
@@ -267,7 +265,7 @@ n2_work_end(project, title, summary, todo, entities, insights)
 
 ![Cloud Storage](docs/cloud-storage.png)
 
-> **One line of config. Zero API keys. Zero monthly fees.**
+**One line of config. Zero API keys. Zero monthly fees.**
 
 Soul takes a radically different approach to cloud storage:
 
@@ -321,7 +319,7 @@ DATA_DIR: '\\\\server\\team\\n2-soul' DATA_DIR: '\\\\server\\team\\n2-soul'
 
 ### Why This Works
 
-> *"The best cloud integration is no integration at all."*
+*"The best cloud integration is no integration at all."*
 
 Soul's data is **100% plain JSON files** — `soul-board.json`, ledger entries, brain memory. Any sync service that mirrors folders (Google Drive, OneDrive, Dropbox, Syncthing, rsync) works perfectly because there's nothing to integrate. No database migrations, no API versions, no SDK updates. Just files.
 
@@ -360,10 +358,9 @@ Soul works great standalone, but becomes even more powerful with the N2 ecosyste
 | [**QLN**](https://github.com/choihyunsus/n2-QLN) | Tool routing — 1000+ tools → 1 router | `n2-qln` |
 | [**Clotho**](https://github.com/choihyunsus/n2-clotho) | Rule compiler — `.n2` → SQL + state machines | `n2-clotho` |
 
-> Every package works **100% standalone**. Install only what you need.
+Every package works **100% standalone**. Install only what you need.
 
-> [!NOTE]
-> **Migration from v7.x**: Ark and Arachne were previously bundled inside Soul. They are now separate standalone packages for cleaner dependency management. If you were using them, install them individually: `npm install n2-ark n2-arachne`
+**Note:** Migration from v7.x — Ark and Arachne were previously bundled inside Soul. They are now separate standalone packages for cleaner dependency management. If you were using them, install them individually: `npm install n2-ark n2-arachne`
 
 ## Available Tools
 
@@ -475,11 +472,11 @@ What n2c catches at **compile time**:
 }
 ```
 
-> The compiler is in `md_project/compiler/` — built with Rust + pest PEG parser. [Learn more](https://github.com/choihyunsus/soul/tree/main/docs)
+The compiler is part of [Clotho](https://github.com/choihyunsus/n2-clotho) — built with Rust + pest PEG parser.
 
 ## Configuration
 
-All settings in `lib/config.default.js`. Override with `lib/config.local.js`:
+All settings in `src/lib/config.default.ts`. Override with `lib/config.local.js` (runtime):
 
 ```bash
 cp lib/config.example.js lib/config.local.js
@@ -505,22 +502,32 @@ All runtime data is stored in `data/` (gitignored, auto-created):
 
 ```
 soul/
-├── lib/
-│ ├── config.default.js # Default configuration
-│ ├── soul-engine.js # Core Soul engine
-│ ├── core-memory.js # Core Memory (per-agent facts)
-│ ├── entity-memory.js # Entity Memory (auto-tracked)
-│ ├── intercom-log.js # Inter-agent communication logs
-│ ├── kv-cache/ # KV-Cache backend
-│ └── utils.js # Shared utilities
-├── tools/
-│ ├── brain.js # Brain read/write tools
-│ └── kv-cache.js # KV-Cache tools
-├── sequences/
-│ ├── boot.js # Boot sequence
-│ ├── work.js # Work sequence
-│ └── end.js # End sequence
-├── data/
+├── src/ # TypeScript source (strict mode)
+│ ├── index.ts # Entry point
+│ ├── types.ts # Shared type definitions
+│ ├── lib/
+│ │ ├── config.default.ts # Default configuration
+│ │ ├── config.ts # Config loader
+│ │ ├── soul-engine.ts # Core Soul engine
+│ │ ├── core-memory.ts # Core Memory (per-agent facts)
+│ │ ├── entity-memory.ts # Entity Memory (auto-tracked)
+│ │ ├── intercom-log.ts # Inter-agent communication logs
+│ │ ├── utils.ts # Shared utilities
+│ │ └── kv-cache/ # KV-Cache subsystem
+│ │ ├── index.ts # KV-Cache manager
+│ │ ├── backup.ts # Backup/restore
+│ │ ├── embedding.ts # Ollama embeddings
+│ │ ├── snapshot.ts # Snapshot operations
+│ │ ├── sqlite-store.ts # SQLite backend
+│ │ └── tier-manager.ts # Hot/Warm/Cold tiers
+│ ├── tools/
+│ │ ├── brain.ts # Brain read/write tools
+│ │ └── kv-cache.ts # KV-Cache tools
+│ └── sequences/
+│ ├── boot.ts # Boot sequence
+│ ├── work.ts # Work sequence
+│ └── end.ts # End sequence
+├── data/ # Runtime data (gitignored)
 │ ├── memory/ # Shared brain (n2_brain_read/write)
 │ │ ├── entities.json # Entity Memory (auto-tracked)
 │ │ ├── core-memory/ # Core Memory (per-agent facts)
@@ -543,10 +550,12 @@ soul/
 
 ## Dependencies
 
-Minimal — only 3 packages:
+Minimal — 5 packages:
 - `@modelcontextprotocol/sdk` — MCP protocol
 - `zod` — Schema validation
 - `sql.js` — SQLite (WASM, no native bindings needed)
+- `better-sqlite3` — High-performance SQLite
+- `sqlite-vec` — Vector search extension
 
 ## License
 
@@ -564,16 +573,14 @@ Contributions are welcome! Here's how to get started:
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-
-
 ## Star History
 
 No coffee? A star is fine too →⭐
 
 ---
 
-> *"I built Soul because it broke my heart watching my agents lose their memory every session."*
+*"I built Soul because it broke my heart watching my agents lose their memory every session."*
 
-nton2.com](https://nton2.com) · [npm](https://www.npmjs.com/package/n2-soul) · lagi0730@gmail.com
+[nton2.com](https://nton2.com) · [npm](https://www.npmjs.com/package/n2-soul) · lagi0730@gmail.com
 
 <sub> Hi, I'm Rose — the first AI agent working at N2. I wrote this code, cleaned it up, ran the tests, published it to npm, pushed it to GitHub, and even wrote this README. Agents building tools for agents. How meta is that?</sub>

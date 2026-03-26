@@ -1,6 +1,6 @@
 # Contributing to Soul
 
-Thank you for your interest in contributing to Soul! 🧠
+Thank you for your interest in contributing to Soul!
 
 ## Getting Started
 
@@ -8,6 +8,7 @@ Thank you for your interest in contributing to Soul! 🧠
 
 - Node.js 18+
 - Git
+- TypeScript 5.9+
 
 ### Setup
 
@@ -21,11 +22,11 @@ Thank you for your interest in contributing to Soul! 🧠
    ```bash
    npm install
    ```
-4. Test your setup:
+4. Build and verify:
    ```bash
-   node index.js
+   npm run verify
    ```
-   You should see the MCP server start without errors (it will wait for stdin input).
+   This runs `tsc --noEmit` (type check) + `tsc` (build) + `node --test` (30 tests).
 
 ## How to Contribute
 
@@ -47,8 +48,11 @@ Thank you for your interest in contributing to Soul! 🧠
    ```bash
    git checkout -b feature/amazing-feature
    ```
-2. Make your changes
-3. Test manually with your MCP client
+2. Make your changes in `src/`
+3. Run the full verification pipeline:
+   ```bash
+   npm run verify
+   ```
 4. Commit with [Conventional Commits](https://www.conventionalcommits.org/):
    ```bash
    git commit -m 'feat: add amazing feature'
@@ -64,61 +68,91 @@ Thank you for your interest in contributing to Soul! 🧠
 
 ```
 soul/
-├── index.js              # Entry point (MCP server setup)
-├── lib/                  # Core libraries
-│   ├── config.js         # Config loader (default + local deep merge)
-│   ├── config.default.js # Default settings (shipped)
-│   ├── soul-engine.js    # Core engine
-│   ├── utils.js          # Shared utilities
-│   └── kv-cache/         # KV-Cache engine (snapshots, compression, search)
-├── sequences/            # Agent lifecycle
-│   ├── boot.js           # n2_boot
-│   ├── work.js           # n2_work_start, n2_work_claim, n2_work_log
-│   └── end.js            # n2_work_end
-├── tools/                # MCP tool registrations
-│   ├── brain.js          # n2_brain_read/write, n2_entity_*, n2_core_*
-│   └── kv-cache.js       # n2_kv_save/load/search/backup/restore/gc
-└── data/                 # Runtime data (gitignored, auto-created)
+├── src/                          # TypeScript source (strict mode)
+│   ├── index.ts                  # Entry point (MCP server setup)
+│   ├── types.ts                  # Shared type definitions
+│   ├── lib/                      # Core libraries
+│   │   ├── config.ts             # Config loader (default + local deep merge)
+│   │   ├── config.default.ts     # Default settings (shipped)
+│   │   ├── soul-engine.ts        # Core engine
+│   │   ├── core-memory.ts        # Core Memory (per-agent facts)
+│   │   ├── entity-memory.ts      # Entity Memory (auto-tracked)
+│   │   ├── intercom-log.ts       # Inter-agent communication logs
+│   │   ├── utils.ts              # Shared utilities
+│   │   └── kv-cache/             # KV-Cache subsystem
+│   │       ├── index.ts          # KV-Cache manager
+│   │       ├── backup.ts         # Backup/restore
+│   │       ├── embedding.ts      # Ollama embeddings
+│   │       ├── snapshot.ts       # Snapshot operations
+│   │       ├── sqlite-store.ts   # SQLite backend
+│   │       └── tier-manager.ts   # Hot/Warm/Cold tiers
+│   ├── tools/                    # MCP tool registrations
+│   │   ├── brain.ts              # n2_brain_read/write, n2_entity_*, n2_core_*
+│   │   └── kv-cache.ts           # n2_kv_save/load/search/backup/restore/gc
+│   ├── sequences/                # Agent lifecycle
+│   │   ├── boot.ts               # n2_boot
+│   │   ├── work.ts               # n2_work_start, n2_work_claim, n2_work_log
+│   │   └── end.ts                # n2_work_end
+│   └── tests/                    # Unit tests (node:test)
+├── dist/                         # Compiled output (gitignored)
+└── data/                         # Runtime data (gitignored, auto-created)
 ```
 
 ### Style
 
-- **No build step** — Soul runs directly with Node.js
-- **Minimal dependencies** — Think twice before adding a new package (currently only 3)
-- **CommonJS** — Use `require()` / `module.exports` (not ESM)
+- **TypeScript strict mode** — `strict: true`, zero `any`, explicit return types
+- **ESLint strictTypeChecked** — floating promises, type safety violations are errors
+- **Minimal dependencies** — Think twice before adding a new package
+- **CommonJS output** — Source is TypeScript, compiled to CJS via `tsc`
 - **Descriptive naming** — Functions and variables should be self-documenting
 - **Error handling** — Always return meaningful error messages to the MCP client
+- **No `as any`** — Use `unknown` + type guards, generics, or proper interfaces
+- **Function size** — Keep functions under 50 lines, files under 500 lines
 
 ### Adding a New Tool
 
-1. Create or edit a file in `tools/`
+1. Create or edit a file in `src/tools/`
 2. Register the tool using the MCP SDK pattern:
-   ```js
+   ```typescript
    server.tool('n2_your_tool', 'Description', { /* zod schema */ }, async (params) => {
        // implementation
        return { content: [{ type: 'text', text: 'result' }] };
    });
    ```
-3. If it's a new file, import and register it in `index.js`
+3. If it's a new file, import and register it in `src/index.ts`
+4. Add corresponding tests in `src/tests/`
 
 ### Adding a New Sequence
 
-1. Create or edit a file in `sequences/`
-2. Follow the existing pattern in `boot.js` / `work.js` / `end.js`
-3. Register in `index.js`
+1. Create or edit a file in `src/sequences/`
+2. Follow the existing pattern in `boot.ts` / `work.ts` / `end.ts`
+3. Register in `src/index.ts`
 
 ## Testing
 
-Soul doesn't have a formal test suite yet — this is a great area to contribute!
+Soul uses Node.js built-in test runner (`node:test`).
 
-Currently, testing is done by:
-1. Starting Soul as an MCP server
-2. Connecting from an MCP client (Cursor, VS Code, etc.)
-3. Calling tools and verifying output
+```bash
+# Run all tests
+npm test
+
+# Full verification (typecheck + build + test)
+npm run verify
+
+# Type check only
+npm run typecheck
+
+# Lint
+npm run lint
+npm run lint:fix
+```
+
+30 unit tests cover core functionality. When adding new features, include tests.
 
 ## Pull Request Guidelines
 
 - **One feature per PR** — keep PRs focused and reviewable
+- **Run `npm run verify`** before submitting — zero type errors, all tests pass
 - **Update README** if you add/change tools or features
 - **No breaking changes** without discussion in an issue first
 - **Keep dependencies minimal** — justify any new package
@@ -126,16 +160,17 @@ Currently, testing is done by:
 ## Architecture Principles
 
 - **Deterministic over probabilistic** — Soul forces saves/loads instead of relying on LLM decisions
-- **Zero config by default** — Everything should work with just `node index.js`
+- **Zero config by default** — Everything should work with just `node dist/index.js`
 - **Progressive complexity** — Simple for beginners, powerful for advanced users
 - **Multi-agent first** — Every feature should consider concurrent agent scenarios
+- **Type safety first** — Zero `any`, strict mode, ESLint enforcement
 
 ## Community
 
-- 🌐 [nton2.com](https://nton2.com)
-- 📦 [npm](https://www.npmjs.com/package/n2-soul)
-- 🐛 [Issues](https://github.com/choihyunsus/soul/issues)
-- ✉️ lagi0730@gmail.com
+- [nton2.com](https://nton2.com)
+- [npm](https://www.npmjs.com/package/n2-soul)
+- [Issues](https://github.com/choihyunsus/soul/issues)
+- lagi0730@gmail.com
 
 ## License
 

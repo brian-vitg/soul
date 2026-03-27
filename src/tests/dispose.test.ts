@@ -25,11 +25,12 @@ describe('Dispose patterns (memory leak prevention)', () => {
         },
       });
 
-      // Timer should be set
-      assert.ok(cache['_backupTimer'] !== null, 'Backup timer should be set after construction');
+      // C5: delay timer should be set (initial 5min wait before first backup)
+      assert.ok(cache['_delayTimer'] !== null, 'Delay timer should be set after construction');
 
-      // Dispose should clear it
+      // Dispose should clear both timers
       cache.dispose();
+      assert.strictEqual(cache['_delayTimer'], null, 'Delay timer should be null after dispose');
       assert.strictEqual(cache['_backupTimer'], null, 'Backup timer should be null after dispose');
 
       fs.rmSync(tmpDir, { recursive: true, force: true });

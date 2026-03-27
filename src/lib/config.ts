@@ -10,7 +10,8 @@ let local: DeepPartial<SoulConfig> = {};
 try {
   // NOTE: require() intentionally kept — config.local.js is a runtime-optional CJS file
   // that may or may not exist. Static import cannot handle optional modules gracefully.
-  local = require('./config.local.js');
+  const rawConf: unknown = require('./config.local.js');
+  local = (typeof rawConf === 'object' && rawConf !== null ? rawConf : {}) as DeepPartial<SoulConfig>;
 } catch (e: unknown) {
   const err = e as NodeJS.ErrnoException;
   if (err.code !== 'MODULE_NOT_FOUND') throw e;
@@ -44,5 +45,16 @@ const config: SoulConfig = deepMerge(
   defaults as unknown as Record<string, unknown>,
   local as unknown as DeepPartial<Record<string, unknown>>,
 ) as unknown as SoulConfig;
+
+// M3: Basic config validation — catch malformed config.local.js early
+if (!config.DATA_DIR || typeof config.DATA_DIR !== 'string') {
+  throw new Error('[soul:config] FATAL: DATA_DIR is missing or invalid. Check config.default.ts or config.local.js');
+}
+if (config.KV_CACHE?.enabled && config.KV_CACHE?.maxSnapshotsPerProject !== undefined) {
+  if (typeof config.KV_CACHE.maxSnapshotsPerProject !== 'number' || config.KV_CACHE.maxSnapshotsPerProject < 1) {
+    console.error('[soul:config] WARNING: KV_CACHE.maxSnapshotsPerProject must be a positive number, using default');
+    config.KV_CACHE.maxSnapshotsPerProject = 50;
+  }
+}
 
 export default config;

@@ -97,13 +97,15 @@ export function registerBootSequence(
         try {
           const { SoulKVCache } = await import('../lib/kv-cache');
           const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE as unknown as Record<string, unknown>);
-          const snap = await kvCache.load(targetProject) as Record<string, unknown> | null;
+          interface KVSnap { id?: string; _level?: string; _promptTokens?: number; _resumePrompt?: string }
+          const snap = await kvCache.load(targetProject) as KVSnap | null;
           if (snap) {
-            setKvChainParent(targetProject, String(snap['id'] ?? ''));
-            const level = String(snap['_level'] ?? 'auto');
-            const tokens = String(snap['_promptTokens'] ?? '?');
-            lines.push(`\nKV-Cache: ${level} | ~${tokens}t | ${String(snap['id'] ?? '').slice(0, 8)}`);
-            if (snap['_resumePrompt']) lines.push(String(snap['_resumePrompt']));
+            const snapId = snap.id ?? '';
+            setKvChainParent(targetProject, snapId);
+            const level = snap._level ?? 'auto';
+            const tokens = String(snap._promptTokens ?? '?');
+            lines.push(`\nKV-Cache: ${level} | ~${tokens}t | ${snapId.slice(0, 8)}`);
+            if (snap._resumePrompt) lines.push(snap._resumePrompt);
           }
         } catch (e) { logError('boot:kv-cache', e); }
       }

@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import config from './lib/config';
 import { registerBootSequence } from './sequences/boot';
-import { registerWorkSequence } from './sequences/work';
+import { registerWorkSequence, disposeWorkSequence } from './sequences/work';
 import { registerEndSequence } from './sequences/end';
 import { registerBrainTools } from './tools/brain';
 import { registerKVCacheTools } from './tools/kv-cache';
@@ -27,7 +27,16 @@ async function boot(): Promise<void> {
   await server.connect(transport);
 }
 
-boot().catch((err: Error) => {
-  console.error(`[n2-soul] Fatal: ${err.message}`);
+boot().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`[n2-soul] Fatal: ${message}`);
   process.exit(1);
 });
+
+// L1: Graceful shutdown — synchronously clean up timers before exit
+function shutdown(): void {
+  disposeWorkSequence();
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

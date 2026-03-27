@@ -36,7 +36,7 @@ function _getTimezone(): string {
       _tz = process.env.N2_TIMEZONE || 'Asia/Seoul';
     }
   }
-  return _tz!;
+  return _tz;
 }
 
 // ── Sync File I/O ──
@@ -62,12 +62,17 @@ export function readJson<T = unknown>(filePath: string): T | null {
 
 export function writeJson(filePath: string, data: unknown): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+  // Atomic write: temp file + rename to prevent corruption on concurrent access
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tmpPath, filePath);
 }
 
 export function writeFile(filePath: string, content: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, content, 'utf8');
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmpPath, content, 'utf8');
+  fs.renameSync(tmpPath, filePath);
 }
 
 // ── Async File I/O (for hot-path non-blocking operations) ──
@@ -96,12 +101,18 @@ export async function readJsonAsync<T = unknown>(filePath: string): Promise<T | 
 
 export async function writeJsonAsync(filePath: string, data: unknown): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  await fsp.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+  await fsp.rename(tmpPath, filePath);
 }
 
 export async function writeFileAsync(filePath: string, content: string): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, content, 'utf8');
+  // Atomic write: temp file + rename to prevent corruption on crash
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  await fsp.writeFile(tmpPath, content, 'utf8');
+  await fsp.rename(tmpPath, filePath);
 }
 
 // ── Time ──

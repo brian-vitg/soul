@@ -1,7 +1,7 @@
 // Soul KV-Cache v9.0 — Orchestrator. Coordinates snapshot, compressor, and adapter.
 import path from 'path';
 import fs from 'fs';
-import { logError, logInfo } from '../utils';
+import { logError, logWarn, logInfo } from '../utils';
 import { SnapshotEngine } from './snapshot';
 import { compress } from './compressor';
 import { fromMcpSession } from './agent-adapter';
@@ -49,10 +49,11 @@ interface BackupResultLike {
 /** Creates the appropriate storage engine based on config */
 function createStorageEngine(
   dataDir: string, config: Partial<KVCacheConfig>,
-): SnapshotEngine | TierManager {
+): { engine: SnapshotEngine | TierManager; readyPromise: Promise<void> } {
   const backend = config.backend || 'json';
   const snapshotDir = config.snapshotDir || path.join(dataDir, 'kv-cache', 'snapshots');
   let engine: SnapshotEngine;
+  let readyPromise: Promise<void> = Promise.resolve();
 
   if (backend === 'sqlite') {
     try {
@@ -60,10 +61,11 @@ function createStorageEngine(
       const { SqliteStore, initSqlJs } = require('./sqlite-store') as typeof import('./sqlite-store');
       const sqliteDir = config.sqliteDir || path.join(dataDir, 'kv-cache', 'sqlite');
       engine = new SqliteStore(sqliteDir) as unknown as SnapshotEngine;
-      initSqlJs().then(() => {
+      readyPromise = initSqlJs().then(() => {
         (engine as unknown as Record<string, boolean>)._ready = true;
-      }).catch((e: Error) => {
-        console.error(`[kv-cache] SQLite init failed: ${e.message}`);
+      }).catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[kv-cache] SQLite init failed: ${msg}`);
       });
     } catch (e) {
       logError('kv-cache:sqlite', `SQLite unavailable (${e instanceof Error ? e.message : String(e)}), falling back to JSON`);
@@ -75,10 +77,10 @@ function createStorageEngine(
 
   const tierConfig = config.tier;
   if (tierConfig) {
-    return new TierManager(engine, tierConfig);
+    return { engine: new TierManager(engine, tierConfig), readyPromise };
   }
 
-  return engine;
+  return { engine, readyPromise };
 }
 
 interface McpSaveInput {
@@ -103,9 +105,14 @@ export class SoulKVCache {
   private _embeddingReady: boolean;
   private _backup: BackupManager | null;
   private _backupTimer: ReturnType<typeof setTimeout> | null;
+  private readonly _readyPromise: Promise<void>;
+
+  private _delayTimer: ReturnType<typeof setTimeout> | null;
 
   constructor(dataDir: string, config: Partial<KVCacheConfig> = {}) {
-    this.snapshot = createStorageEngine(dataDir, config);
+    const { engine, readyPromise } = createStorageEngine(dataDir, config);
+    this.snapshot = engine;
+    this._readyPromise = readyPromise;
     this.dataDir = dataDir;
     this.config = {
       backend: config.backend || 'json',
@@ -136,23 +143,26 @@ export class SoulKVCache {
     // Backup manager (optional)
     this._backup = null;
     this._backupTimer = null;
+    this._delayTimer = null;
     const backupConfig = config.backup;
     if (backupConfig?.enabled) {
       this._backup = new BackupManager(dataDir, backupConfig as unknown as ConstructorParameters<typeof BackupManager>[1]);
       const schedule = backupConfig.schedule || 'daily';
       if (schedule !== 'manual') {
         const intervalMs = schedule === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-        this._backupTimer = setTimeout(() => {
-          void this._runAutoBackup().catch(e => logError('kv-cache:auto-backup', e));
+        // C5 fix: separate delay timer from recurring timer for clean disposal
+        this._delayTimer = setTimeout(() => {
+          this._delayTimer = null;
+          void this._runAutoBackup().catch((e: unknown) => logError('kv-cache:auto-backup', e));
           this._backupTimer = setInterval(() => {
-            void this._runAutoBackup().catch(e => logError('kv-cache:auto-backup', e));
+            void this._runAutoBackup().catch((e: unknown) => logError('kv-cache:auto-backup', e));
           }, intervalMs);
           if (this._backupTimer && 'unref' in this._backupTimer) {
-            (this._backupTimer as NodeJS.Timeout).unref();
+            (this._backupTimer).unref();
           }
         }, 5 * 60 * 1000);
-        if (this._backupTimer && 'unref' in this._backupTimer) {
-          (this._backupTimer as NodeJS.Timeout).unref();
+        if (this._delayTimer && 'unref' in this._delayTimer) {
+          (this._delayTimer).unref();
         }
         logInfo('kv-cache:backup', `Auto-backup scheduled: ${schedule}`);
       }
@@ -161,15 +171,12 @@ export class SoulKVCache {
 
   /** Cleanup timers and resources — call before discarding instance */
   dispose(): void {
-    if (this._backupTimer) {
-      clearTimeout(this._backupTimer as NodeJS.Timeout);
-      clearInterval(this._backupTimer as NodeJS.Timeout);
-      this._backupTimer = null;
-    }
+    this.stopAutoBackup();
   }
 
   /** Save a session snapshot with automatic compression */
   async save(agent: string, project: string, sessionData: McpSaveInput): Promise<string> {
+    await this._readyPromise;  // M4: wait for SQLite init before any operation
     const normalized = fromMcpSession({ agent, project, ...sessionData });
 
     if (normalized.context.summary) {
@@ -184,8 +191,12 @@ export class SoulKVCache {
     if (this._embeddingReady && this.embedding) {
       const text = this.embedding.snapshotToText(normalized);
       this.embedding.embed(text).then(vec => {
-        if (vec.length > 0) this._storeEmbedding(project, id, vec);
-      }).catch(e => { logError('kv-cache:embed', e); });
+        if (vec.length > 0) {
+          this._storeEmbedding(project, id, vec);
+        } else {
+          logWarn('kv-cache:embed', `Empty embedding for snapshot ${id} — semantic search will skip it`);
+        }
+      }).catch((e: unknown) => { logError('kv-cache:embed', `Embedding failed for snapshot ${id}: ${e instanceof Error ? e.message : String(e)}`); });
     }
 
     return id;
@@ -193,12 +204,13 @@ export class SoulKVCache {
 
   /** Load the most recent snapshot for a project */
   async load(project: string, options: LoadOptions = {}): Promise<LoadedSnapshot | null> {
+    await this._readyPromise;
     const snap = await this.snapshot.loadLatest(project);
     if (!snap) return null;
 
     // Forgetting Curve: track access
     if (snap.id && 'touch' in this.snapshot) {
-      (this.snapshot as TierManager).touch(snap.projectName || project, snap.id).catch(e => logError('kv-cache:touch', e));
+      (this.snapshot as TierManager).touch(snap.projectName || project, snap.id).catch((e: unknown) => logError('kv-cache:touch', e));
     }
 
     const level = options.level || 'auto';
@@ -222,6 +234,7 @@ export class SoulKVCache {
 
   /** Search across snapshots by keyword or semantic similarity */
   async search(query: string, project: string, limit: number = 10): Promise<SessionData[]> {
+    await this._readyPromise;
     if (this._embeddingReady && this.embedding) {
       return this._semanticSearch(query, project, limit);
     }
@@ -246,9 +259,10 @@ export class SoulKVCache {
 
       const ranked = this.embedding.rankBySimilarity(queryVec, candidates, limit, 0.2);
       return ranked.map(r => {
-        const c = candidates.find(c => c.id === r.id);
-        return { ...c!.snap, _score: r.score } as SessionData & { _score: number };
-      });
+        const match = candidates.find(c => c.id === r.id);
+        if (!match) return null;
+        return { ...match.snap, _score: r.score } as SessionData & { _score: number };
+      }).filter(Boolean) as (SessionData & { _score: number })[];
     } catch (e) {
       logError('kv-cache:semantic-search', e);
       return await this.snapshot.search(query, project, limit);
@@ -263,6 +277,7 @@ export class SoulKVCache {
   /** Garbage collect old snapshots */
   async gc(project: string, maxAgeDays?: number): Promise<{ deleted: number }> {
     const age = maxAgeDays ?? this.config.maxSnapshotAgeDays;
+    await this._readyPromise;
     return await this.snapshot.gc(project, age, this.config.maxSnapshotsPerProject);
   }
 
@@ -338,7 +353,7 @@ export class SoulKVCache {
 
       for (const project of projects) {
         try {
-          const result = await this._backup!.backup(project, {}) as BackupResultLike;
+          const result = await this._backup.backup(project, {}) as BackupResultLike;
           if (result.type !== 'skip' && result.type !== 'empty') {
             console.error(`[kv-cache] Auto-backup: ${project} → ${result.sizeFormatted || ''} (${result.type})`);
           }
@@ -351,9 +366,12 @@ export class SoulKVCache {
 
   /** Stop auto-backup scheduler and cleanup */
   stopAutoBackup(): void {
+    if (this._delayTimer) {
+      clearTimeout(this._delayTimer);
+      this._delayTimer = null;
+    }
     if (this._backupTimer) {
-      clearTimeout(this._backupTimer as NodeJS.Timeout);
-      clearInterval(this._backupTimer as NodeJS.Timeout);
+      clearInterval(this._backupTimer);
       this._backupTimer = null;
     }
   }

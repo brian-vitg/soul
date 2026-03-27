@@ -53,8 +53,8 @@ export class TierManager {
 
   constructor(storageEngine: SnapshotEngine, config: TierConfig = {}) {
     this.engine = storageEngine;
-    this.hotDays = config.hotDays || TIERS['HOT']!.maxAgeDays;
-    this.warmDays = config.warmDays || TIERS['WARM']!.maxAgeDays;
+    this.hotDays = config.hotDays || TIERS['HOT']?.maxAgeDays || 7;
+    this.warmDays = config.warmDays || TIERS['WARM']?.maxAgeDays || 30;
     this._hotCache = {};
   }
 

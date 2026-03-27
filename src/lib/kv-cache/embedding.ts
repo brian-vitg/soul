@@ -82,11 +82,16 @@ export class EmbeddingEngine {
     return [];
   }
 
-  /** Generate embeddings for multiple texts in batch */
+  /** Generate embeddings for multiple texts in batch (bounded concurrency) */
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-    for (const text of texts) {
-      results.push(await this.embed(text));
+    const CONCURRENCY = 4;
+    const results: number[][] = new Array<number[]>(texts.length);
+    for (let i = 0; i < texts.length; i += CONCURRENCY) {
+      const batch = texts.slice(i, i + CONCURRENCY);
+      const batchResults: number[][] = await Promise.all(batch.map(text => this.embed(text)));
+      for (let j = 0; j < batchResults.length; j++) {
+        results[i + j] = batchResults[j] ?? [];
+      }
     }
     return results;
   }

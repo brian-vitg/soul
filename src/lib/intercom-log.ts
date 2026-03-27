@@ -109,7 +109,7 @@ export function writeConversationLog(
   meta: ProviderMeta,
 ): { callerLog: string; targetLog: string } | null {
   const safeCaller = normalizeName(caller);
-  const targetName = typeof target === 'object' ? (target.name || String(target)) : target;
+  const targetName = typeof target === 'object' ? (target.name || JSON.stringify(target)) : target;
   const safeTarget = normalizeName(targetName);
 
   const date = nowISO().split('T')[0];

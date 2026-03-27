@@ -80,7 +80,7 @@ export function registerEndSequence(
           blockers: [],
         };
 
-        const dateStr = (nowISO().split('T')[0] ?? '').slice(5);
+        const dateStr = nowISO().split('T')[0] ?? '';
         for (const d of allDecisions) {
           board.decisions.push({ date: dateStr, by: agent, what: d, why: '' });
         }
@@ -101,15 +101,23 @@ export function registerEndSequence(
       // 4. Clear active work
       engine.clearActiveWork(project, agent);
 
-      // 5. Auto-update file-index tree
+      // 5. Auto-update file-index tree (shallow scan to avoid blocking)
       try {
         const projectRoot = path.resolve(config.SOUL_ROOT, '..');
         const tree = engine.scanDirectory(projectRoot, {
-          maxDepth: config.SEARCH?.maxDepth ?? 4,
+          maxDepth: Math.min(config.SEARCH?.maxDepth ?? 3, 3),
+          excludes: ['node_modules', '.git', 'dist', 'out', '.next', '__pycache__', '.venv', 'build'],
         });
         engine.writeFileIndex(project, { updatedAt: nowISO(), tree });
       } catch (e) {
         logError('end:file-index', e);
+      }
+
+      // 5b. Auto-prune old ledger entries (90 days)
+      try {
+        engine.pruneLedger(project, 90);
+      } catch (e) {
+        logError('end:ledger-prune', e);
       }
 
       // 6. Clear in-memory session
@@ -117,9 +125,10 @@ export function registerEndSequence(
 
       // 7. Auto-save KV-Cache snapshot (with session chaining) + auto-GC
       if (config.KV_CACHE?.enabled && config.KV_CACHE?.autoSaveOnWorkEnd) {
+        let kvCache: InstanceType<typeof import('../lib/kv-cache').SoulKVCache> | null = null;
         try {
           const { SoulKVCache } = await import('../lib/kv-cache');
-          const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE as unknown as Record<string, unknown>);
+          kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE as unknown as Record<string, unknown>);
           const parentId = popKvChainParent(project);
           await kvCache.save(agent, project, {
             summary,
@@ -140,6 +149,9 @@ export function registerEndSequence(
           }
         } catch (e) {
           logError('end:kv-cache', e);
+        } finally {
+          // M1 fix: dispose one-shot instance to prevent timer leaks
+          if (kvCache) kvCache.dispose();
         }
       }
 

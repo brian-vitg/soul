@@ -45,6 +45,37 @@ interface KVBackupListInput {
   project: string;
 }
 
+/** Typed results from kvCache operations to avoid Record<string, unknown> */
+interface KVBackupResult {
+  type: string;
+  message?: string;
+  backupId?: string;
+  sizeFormatted?: string;
+  snapshots?: string | number;
+  embeddings?: string | number;
+}
+
+interface KVRestoreResult {
+  error?: string;
+  backupId?: string;
+  restored?: number;
+  embeddings?: number;
+  target?: string;
+}
+
+interface KVBackupInfo {
+  id?: string;
+  type?: string;
+  sizeFormatted?: string;
+  timestamp?: string;
+}
+
+interface KVBackupStatus {
+  totalBackups?: number;
+  totalBackupSize?: string;
+  lastBackup?: string;
+}
+
 export function registerKVCacheTools(
   server: McpToolServer,
   z: typeof ZodType,
@@ -166,17 +197,22 @@ export function registerKVCacheTools(
     },
     async ({ project, full }: KVBackupInput) => {
       try {
-        const result = await kvCache.backup(project, { full }) as Record<string, unknown>;
-        if (result['type'] === 'skip') {
-          return { content: [{ type: 'text', text: `KV-Cache backup skipped: ${String(result['message'] ?? '')}` }] };
+        const result = await kvCache.backup(project, { full }) as unknown as KVBackupResult;
+        if (result.type === 'skip') {
+          return { content: [{ type: 'text', text: `KV-Cache backup skipped: ${result.message ?? ''}` }] };
         }
-        if (result['type'] === 'empty') {
+        if (result.type === 'empty') {
           return { content: [{ type: 'text', text: `KV-Cache backup: no data for ${project}.` }] };
         }
+        const bId = result.backupId ?? '';
+        const bType = result.type;
+        const bSize = result.sizeFormatted ?? '';
+        const bSnaps = String(result.snapshots ?? 'copied');
+        const bEmbs = String(result.embeddings ?? 'included');
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache backup created: ${String(result['backupId'] ?? '')}\nType: ${String(result['type'])} | Size: ${String(result['sizeFormatted'] ?? '')}\nSnapshots: ${String(result['snapshots'] ?? 'copied')} | Embeddings: ${String(result['embeddings'] ?? 'included')}`,
+            text: `KV-Cache backup created: ${bId}\nType: ${bType} | Size: ${bSize}\nSnapshots: ${bSnaps} | Embeddings: ${bEmbs}`,
           }],
         };
       } catch (err) {
@@ -197,14 +233,18 @@ export function registerKVCacheTools(
     },
     async ({ project, backupId, target }: KVRestoreInput) => {
       try {
-        const result = await kvCache.restore(project, backupId, { target: target as 'json' | 'sqlite' | undefined }) as Record<string, unknown>;
-        if (result['error']) {
-          return { content: [{ type: 'text', text: `KV-Cache restore error: ${String(result['error'])}` }] };
+        const result = await kvCache.restore(project, backupId, { target: target as 'json' | 'sqlite' | undefined }) as unknown as KVRestoreResult;
+        if (result.error) {
+          return { content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
         }
+        const rId = result.backupId ?? '';
+        const rRestored = String(result.restored ?? 0);
+        const rEmbs = String(result.embeddings ?? 0);
+        const rTarget = result.target ?? 'json';
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache restored from ${String(result['backupId'] ?? '')}: ${String(result['restored'])} snapshots, ${String(result['embeddings'] ?? 0)} embeddings (target: ${String(result['target'])})`,
+            text: `KV-Cache restored from ${rId}: ${rRestored} snapshots, ${rEmbs} embeddings (target: ${rTarget})`,
           }],
         };
       } catch (err) {
@@ -223,18 +263,25 @@ export function registerKVCacheTools(
     },
     async ({ project }: KVBackupListInput) => {
       try {
-        const backups = kvCache.listBackups(project) as Array<Record<string, unknown>>;
+        const backups = kvCache.listBackups(project) as unknown as KVBackupInfo[];
         if (backups.length === 0) {
           return { content: [{ type: 'text', text: `No backups for ${project}.` }] };
         }
-        const status = kvCache.backupStatus(project) as Record<string, unknown>;
-        const lines = backups.map((b, i) =>
-          `${i + 1}. [${String(b['id'] ?? '')}] ${String(b['type'] ?? '')} | ${String(b['sizeFormatted'] ?? '')} | ${String(b['timestamp'] ?? '').split('T')[0] ?? ''}`,
-        );
+        const status = kvCache.backupStatus(project) as unknown as KVBackupStatus;
+        const lines = backups.map((b, i) => {
+          const bId = b.id ?? '';
+          const bType = b.type ?? '';
+          const bSize = b.sizeFormatted ?? '';
+          const bTime = (b.timestamp ?? '').split('T')[0] ?? '';
+          return `${i + 1}. [${bId}] ${bType} | ${bSize} | ${bTime}`;
+        });
+        const totalBackups = String(status.totalBackups ?? 0);
+        const totalSize = status.totalBackupSize ?? '';
+        const lastBackup = status.lastBackup ?? 'never';
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache backups for ${project}: ${String(status['totalBackups'])} total (${String(status['totalBackupSize'])})\nLast: ${String(status['lastBackup'] ?? 'never')}\n\n${lines.join('\n')}`,
+            text: `KV-Cache backups for ${project}: ${totalBackups} total (${totalSize})\nLast: ${lastBackup}\n\n${lines.join('\n')}`,
           }],
         };
       } catch (err) {

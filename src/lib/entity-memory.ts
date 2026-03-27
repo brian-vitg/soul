@@ -95,20 +95,58 @@ export class EntityMemory {
       mentionCount: 1,
     };
     data.entities.push(newEntity);
+
+    // Auto-cap: remove least-mentioned entities when exceeding limit
+    const MAX_ENTITIES = 500;
+    if (data.entities.length > MAX_ENTITIES) {
+      data.entities.sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0));
+      data.entities = data.entities.slice(0, MAX_ENTITIES);
+    }
+
     this._save(data);
     return { action: 'created', entity: newEntity };
   }
 
-  /** Batch upsert multiple entities */
+  /** Batch upsert multiple entities (single disk write for performance) */
   upsertBatch(entities: EntityInput[]): BatchResult {
     if (!Array.isArray(entities)) return { created: 0, updated: 0, skipped: 0 };
     const stats: BatchResult = { created: 0, updated: 0, skipped: 0 };
-    for (const e of entities) {
-      const result = this.upsert(e);
-      if (result.action === 'created') stats.created++;
-      else if (result.action === 'updated') stats.updated++;
-      else stats.skipped++;
+    const data = this._load();
+    let changed = false;
+
+    for (const entity of entities) {
+      if (!entity || !entity.name || !entity.type) {
+        stats.skipped++;
+        continue;
+      }
+      const nameKey = entity.name.toLowerCase().trim();
+      const existing = data.entities.find(
+        e => e.name.toLowerCase().trim() === nameKey && e.type === entity.type,
+      );
+      if (existing) {
+        existing.attributes = { ...existing.attributes, ...(entity.attributes || {}) };
+        existing.lastMentioned = nowISO();
+        existing.mentionCount = (existing.mentionCount || 1) + 1;
+        stats.updated++;
+      } else {
+        data.entities.push({
+          type: entity.type, name: entity.name,
+          attributes: entity.attributes || {},
+          firstSeen: nowISO(), lastMentioned: nowISO(), mentionCount: 1,
+        });
+        stats.created++;
+      }
+      changed = true;
     }
+
+    // Auto-cap after batch
+    const MAX_ENTITIES = 500;
+    if (data.entities.length > MAX_ENTITIES) {
+      data.entities.sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0));
+      data.entities = data.entities.slice(0, MAX_ENTITIES);
+    }
+
+    if (changed) this._save(data);
     return stats;
   }
 

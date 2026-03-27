@@ -121,7 +121,7 @@ export class SoulEngine {
     const board = this.readBoard(projectName);
     for (const [fp, info] of Object.entries(board.fileOwnership)) {
       if (info.owner === agent) {
-        board.fileOwnership[fp] = { owner: null };
+        delete board.fileOwnership[fp];
       }
     }
     board.updatedBy = agent;
@@ -192,6 +192,51 @@ export class SoulEngine {
     this.writeBoard(projectName, board);
 
     return { id, path: path.join(dir, fileName) };
+  }
+
+  // ── Ledger Pruning ──
+
+  /** Remove ledger entries older than maxAgeDays */
+  pruneLedger(projectName: string, maxAgeDays: number = 90): number {
+    const ledgerBase = path.join(this.projectDir(projectName), 'ledger');
+    if (!fs.existsSync(ledgerBase)) return 0;
+
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    let deleted = 0;
+
+    try {
+      for (const year of fs.readdirSync(ledgerBase)) {
+        const yearDir = path.join(ledgerBase, year);
+        if (!fs.statSync(yearDir).isDirectory()) continue;
+
+        for (const month of fs.readdirSync(yearDir)) {
+          const monthDir = path.join(yearDir, month);
+          if (!fs.statSync(monthDir).isDirectory()) continue;
+
+          for (const day of fs.readdirSync(monthDir)) {
+            const dayDir = path.join(monthDir, day);
+            if (!fs.statSync(dayDir).isDirectory()) continue;
+
+            const dateStr = `${year}-${month}-${day}`;
+            const dirTime = new Date(dateStr).getTime();
+            if (isNaN(dirTime) || dirTime >= cutoff) continue;
+
+            // Delete all files in old day directory
+            for (const file of fs.readdirSync(dayDir)) {
+              try { fs.unlinkSync(path.join(dayDir, file)); deleted++; } catch { /* skip */ }
+            }
+            try { fs.rmdirSync(dayDir); } catch { /* non-empty or permission */ }
+          }
+          // Clean empty month dir
+          try { fs.rmdirSync(monthDir); } catch { /* */ }
+        }
+        // Clean empty year dir
+        try { fs.rmdirSync(yearDir); } catch { /* */ }
+      }
+    } catch (e) {
+      logError('pruneLedger', e);
+    }
+    return deleted;
   }
 
   // ── All Projects (sorted by recency) ──

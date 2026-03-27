@@ -23,7 +23,7 @@ export const LEVELS: Record<string, LevelSpec> = {
 export function extractAtLevel(snapshot: SessionData | null, level: string = 'L2'): LoadResult {
   if (!snapshot) return { level, tokens: 0, prompt: '' };
 
-  const spec = LEVELS[level] ?? LEVELS['L2']!;
+  const spec = LEVELS[level] ?? LEVELS['L2'] ?? { name: 'standard', maxTokens: 2000 };
   const lines: string[] = [];
 
   // L1: Minimal (keywords + TODO)

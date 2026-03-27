@@ -3,6 +3,21 @@ import path from 'path';
 import fs from 'fs';
 // SessionData types imported lazily
 
+/** Raw snapshot structure as written to JSON files */
+interface SnapshotRaw {
+  id?: string;
+  agentName?: string;
+  agentType?: string;
+  model?: string;
+  startedAt?: string;
+  endedAt?: string;
+  turnCount?: number;
+  tokenEstimate?: number;
+  keys?: string[];
+  context?: Record<string, unknown>;
+  parentSessionId?: string;
+  projectName?: string;
+}
 // Lazy-import sql.js types (same as sqlite-store)
 interface SqlJsModule {
   Database: new (data?: ArrayLike<number>) => SqlJsDatabase;
@@ -197,13 +212,13 @@ export class BackupManager {
       for (const filePath of snapFiles) {
         try {
           const raw = fs.readFileSync(filePath, 'utf-8');
-          const s = JSON.parse(raw) as Record<string, unknown>;
+          const s = JSON.parse(raw) as SnapshotRaw;
           stmt.run([
-            String(s.id || ''), String(s.agentName || 'unknown'), String(s.agentType || 'external'),
-            s.model ? String(s.model) : null, s.startedAt ? String(s.startedAt) : null,
-            s.endedAt ? String(s.endedAt) : null, Number(s.turnCount || 0), Number(s.tokenEstimate || 0),
-            JSON.stringify(s.keys || []), JSON.stringify(s.context || {}),
-            s.parentSessionId ? String(s.parentSessionId) : null, String(s.projectName || project),
+            s.id ?? '', s.agentName ?? 'unknown', s.agentType ?? 'external',
+            s.model ?? null, s.startedAt ?? null,
+            s.endedAt ?? null, s.turnCount ?? 0, s.tokenEstimate ?? 0,
+            JSON.stringify(s.keys ?? []), JSON.stringify(s.context ?? {}),
+            s.parentSessionId ?? null, s.projectName ?? project,
           ]);
           snapCount++;
         } catch { /* skip corrupt */ }
@@ -291,11 +306,15 @@ export class BackupManager {
           id: obj.id, agentName: obj.agent_name, agentType: obj.agent_type,
           model: obj.model, startedAt: obj.started_at, endedAt: obj.ended_at,
           turnCount: obj.turn_count, tokenEstimate: obj.token_estimate,
-          keys: JSON.parse(String(obj.keys || '[]')),
-          context: JSON.parse(String(obj.context || '{}')),
+          keys: JSON.parse(String(obj.keys ?? '[]')) as string[],
+          context: JSON.parse(String(obj.context ?? '{}')) as Record<string, unknown>,
           parentSessionId: obj.parent_session_id, projectName: obj.project_name,
         };
-        fs.writeFileSync(path.join(snapDir, `${String(session.id)}.json`), JSON.stringify(session, null, 2));
+        // M5 fix: write to date-dir structure so SnapshotEngine.list() can find them
+        const dateStr = (String(session.endedAt || session.startedAt || '')).split('T')[0] || '1970-01-01';
+        const dateDir = path.join(snapDir, dateStr);
+        if (!fs.existsSync(dateDir)) fs.mkdirSync(dateDir, { recursive: true });
+        fs.writeFileSync(path.join(dateDir, `${String(session.id)}.json`), JSON.stringify(session, null, 2));
         restoredSnaps++;
       }
     }
@@ -350,7 +369,8 @@ export class BackupManager {
   }
 
   private _makeBackupId(): string {
-    return new Date().toISOString().slice(0, 10);
+    const iso = new Date().toISOString();
+    return iso.slice(0, 10) + '_' + iso.slice(11, 19).replace(/:/g, '');
   }
 
   private _loadManifest(project: string): Manifest {
@@ -370,7 +390,7 @@ export class BackupManager {
   private _formatBytes(bytes: number): string {
     if (!bytes) return '0 B';
     const u = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), u.length - 1);
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${u[i]}`;
   }
 }

@@ -96,12 +96,13 @@ export class SqliteStore {
     const dbPath = path.join(this.baseDir, `${projectName}.sqlite`);
     if (!fs.existsSync(this.baseDir)) fs.mkdirSync(this.baseDir, { recursive: true });
 
+    if (!_SQL) throw new Error('SQL.js not initialized');
     let db: SqlJsDatabase;
     if (fs.existsSync(dbPath)) {
       const buffer = fs.readFileSync(dbPath);
-      db = new _SQL!.Database(buffer);
+      db = new _SQL.Database(buffer);
     } else {
-      db = new _SQL!.Database();
+      db = new _SQL.Database();
     }
 
     const isToolCatalog = projectName === '_tool-catalog';
@@ -210,7 +211,8 @@ export class SqliteStore {
     `, [projectName, limit]);
 
     if (results.length === 0 || !results[0]) return [];
-    return results[0].values.map(row => this._resultToSession(results[0]!.columns, row));
+    const cols = results[0].columns;
+    return results[0].values.map(row => this._resultToSession(cols, row));
   }
 
   /** Search snapshots by keyword (LIKE-based) */
@@ -219,10 +221,12 @@ export class SqliteStore {
     const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length >= 2);
     if (keywords.length === 0) return [];
 
-    const conditions = keywords.map(() => `(LOWER(keys) LIKE ? OR LOWER(context) LIKE ?)`).join(' AND ');
+    const conditions = keywords.map(() => `(LOWER(keys) LIKE ? ESCAPE '\\' OR LOWER(context) LIKE ? ESCAPE '\\')`).join(' AND ');
     const params: SqlJsValue[] = [];
     for (const kw of keywords) {
-      params.push(`%${kw}%`, `%${kw}%`);
+      // Escape LIKE wildcards to prevent unintended matching
+      const escaped = kw.replace(/[%_\\]/g, '\\$&');
+      params.push(`%${escaped}%`, `%${escaped}%`);
     }
     params.push(projectName, limit);
 
@@ -235,9 +239,10 @@ export class SqliteStore {
     `, params);
 
     if (results.length === 0 || !results[0]) return [];
+    const cols = results[0].columns;
     return results[0].values
       .map(row => {
-        const session = this._resultToSession(results[0]!.columns, row);
+        const session = this._resultToSession(cols, row);
         const text = JSON.stringify(session).toLowerCase();
         const _score = keywords.reduce((sum, kw) => {
           const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -259,7 +264,8 @@ export class SqliteStore {
     );
     if (results.length === 0 || !results[0]) return { deleted: 0 };
 
-    const snapshots = results[0].values.map(row => this._resultToSession(results[0]!.columns, row));
+    const cols = results[0].columns;
+    const snapshots = results[0].values.map(row => this._resultToSession(cols, row));
     const cutoff = Date.now() - (maxAgeDays * 24 * 60 * 60 * 1000);
     let deleted = 0;
     const survivors: Array<{ snap: SessionData; score: number }> = [];

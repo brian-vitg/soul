@@ -42,16 +42,18 @@ export function disposeWorkSequence(): void {
   }
 }
 
-// ── Helper: recursively walk files ──
-function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: number, depth: number = 0): void {
-  if (depth > maxDepth) return;
+// ── Helper: recursively walk files (with cap to prevent event loop blocking) ──
+function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: number, depth: number = 0, counter: { n: number; max: number } = { n: 0, max: 200 }): void {
+  if (depth > maxDepth || counter.n >= counter.max) return;
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (counter.n >= counter.max) break;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        walkFiles(fullPath, callback, maxDepth, depth + 1);
+        walkFiles(fullPath, callback, maxDepth, depth + 1, counter);
       } else {
         callback(fullPath);
+        counter.n++;
       }
     }
   } catch (e) {
@@ -252,14 +254,16 @@ export function registerWorkSequence(
               if (!fs.existsSync(ledgerBase)) continue;
               walkFiles(ledgerBase, (fp) => {
                 if (!fp.endsWith('.json')) return;
-                const data = readJson(fp) as Record<string, unknown> | null;
+                interface LedgerEntry { title?: string; summary?: string; decisions?: string[]; completedAt?: string; startedAt?: string; agent?: string }
+                const data = readJson<LedgerEntry>(fp);
                 if (!data) return;
-                const text = [data['title'], data['summary'], ...((data['decisions'] as string[]) ?? [])].filter(Boolean).join(' ');
+                const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+                const text = [data.title ?? '', data.summary ?? '', ...decisions].filter(Boolean).join(' ');
                 const relPath = path.relative(projectsDir, fp);
                 scoreText(text, `projects/${relPath}`, 'ledger', {
-                  timestamp: String(data['completedAt'] ?? data['startedAt'] ?? ''),
-                  agent: String(data['agent'] ?? ''),
-                  title: String(data['title'] ?? ''),
+                  timestamp: data.completedAt ?? data.startedAt ?? '',
+                  agent: data.agent ?? '',
+                  title: data.title ?? '',
                 });
               }, maxDepth);
             }

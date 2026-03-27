@@ -8,3 +8,4 @@ All storage backends implement the `StorageAdapter` interface (defined in `stora
 - `SnapshotEngine` — JSON file-based storage (default)
 - `SqliteStore` — SQLite storage via sql.js (WASM, no native deps)
 - `TierManager` — Hot/Warm/Cold tiered wrapper over any StorageAdapter
+- `PerfMonitor` — Self-tuning GC via query latency tracking (perf-aware retention)

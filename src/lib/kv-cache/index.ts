@@ -9,6 +9,8 @@ import { extractAtLevel, autoLevel } from './token-saver';
 import { TierManager } from './tier-manager';
 import { EmbeddingEngine } from './embedding';
 import { BackupManager } from './backup';
+import { PerfMonitor } from './perf-monitor';
+import type { PerfSnapshot } from './perf-monitor';
 import type { BackupResult, RestoreResult, ManifestEntry, BackupStatusResult } from './backup';
 import type { SessionData } from './schema';
 import type { KVCacheConfig } from '../../types';
@@ -115,6 +117,7 @@ export class SoulKVCache {
   private readonly _readyPromise: Promise<void>;
 
   private _delayTimer: ReturnType<typeof setTimeout> | null;
+  private readonly _perf: PerfMonitor;
 
   constructor(dataDir: string, config: Partial<KVCacheConfig> = {}) {
     const { engine, readyPromise } = createStorageEngine(dataDir, config);
@@ -151,6 +154,11 @@ export class SoulKVCache {
     this._backup = null;
     this._backupTimer = null;
     this._delayTimer = null;
+    this._perf = new PerfMonitor({
+      windowSize: 50,
+      slowThresholdMs: config.perfSlowMs ?? 100,
+      criticalThresholdMs: config.perfCriticalMs ?? 500,
+    });
     const backupConfig = config.backup;
     if (backupConfig?.enabled) {
       this._backup = new BackupManager(dataDir, {
@@ -216,7 +224,9 @@ export class SoulKVCache {
   /** Load the most recent snapshot for a project */
   async load(project: string, options: LoadOptions = {}): Promise<LoadedSnapshot | null> {
     await this._readyPromise;
+    const start = performance.now();
     const snap = await this.snapshot.loadLatest(project);
+    this._perf.record(performance.now() - start);
     if (!snap) return null;
 
     // Forgetting Curve: track access
@@ -246,10 +256,15 @@ export class SoulKVCache {
   /** Search across snapshots by keyword or semantic similarity */
   async search(query: string, project: string, limit: number = 10): Promise<SessionData[]> {
     await this._readyPromise;
+    const start = performance.now();
+    let results: SessionData[];
     if (this._embeddingReady && this.embedding) {
-      return this._semanticSearch(query, project, limit);
+      results = await this._semanticSearch(query, project, limit);
+    } else {
+      results = await this.snapshot.search(query, project, limit);
     }
-    return await this.snapshot.search(query, project, limit);
+    this._perf.record(performance.now() - start);
+    return results;
   }
 
   private async _semanticSearch(query: string, project: string, limit: number): Promise<SessionData[]> {
@@ -285,11 +300,27 @@ export class SoulKVCache {
     return await this.snapshot.list(project, limit);
   }
 
-  /** Garbage collect old snapshots */
-  async gc(project: string, maxAgeDays?: number): Promise<{ deleted: number }> {
-    const age = maxAgeDays ?? this.config.maxSnapshotAgeDays;
+  /** Garbage collect old snapshots (perf-aware: auto-tightens when queries slow down) */
+  async gc(project: string, maxAgeDays?: number): Promise<{ deleted: number; perfTuned: boolean }> {
+    const baseAge = maxAgeDays ?? this.config.maxSnapshotAgeDays;
+    const baseCount = this.config.maxSnapshotsPerProject;
+    const rec = this._perf.recommendGC(baseAge, baseCount);
+
     await this._readyPromise;
-    return await this.snapshot.gc(project, age, this.config.maxSnapshotsPerProject);
+    const result = await this.snapshot.gc(project, rec.maxAgeDays, rec.maxCount);
+
+    if (rec.aggressive) {
+      logWarn('kv-cache:gc', `Perf-tuned GC: ${rec.reason}`);
+    } else if (rec.maxAgeDays !== baseAge) {
+      logInfo('kv-cache:gc', `Perf-adjusted GC: ${rec.reason}`);
+    }
+
+    return { deleted: result.deleted, perfTuned: rec.maxAgeDays !== baseAge || rec.maxCount !== baseCount };
+  }
+
+  /** Get current query performance metrics */
+  getPerfSnapshot(): PerfSnapshot {
+    return this._perf.getSnapshot();
   }
 
   /** Estimate token count for a text string */

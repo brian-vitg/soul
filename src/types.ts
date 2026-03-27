@@ -197,6 +197,8 @@ export interface KVCacheConfig {
   tier: TierConfig;
   embedding: EmbeddingConfig;
   backup: BackupConfig;
+  perfSlowMs?: number;
+  perfCriticalMs?: number;
 }
 
 export interface TokenBudgetConfig {

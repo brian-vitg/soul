@@ -2,7 +2,32 @@
 
 All notable changes to Soul are documented here.
 
-## [9.0.6] — 2026-03-27
+## [9.0.7] — 2026-03-27
+
+### PerfMonitor — Self-Tuning GC
+
+Forgetting Curve GC now self-tunes based on actual query latency. When snapshots grow large enough to slow queries, retention tightens automatically — up to 3x reduction — without losing important history (Forgetting Curve scores still determine which snapshots survive).
+
+#### Added
+- **`PerfMonitor`** (`perf-monitor.ts`) — sliding-window latency tracker with p95 analysis
+- **`getPerfSnapshot()`** — exposes avg/p95 latency and sample count for diagnostics
+- **Auto-instrumented `load()` and `search()`** — every query records its latency
+- **Perf-aware `gc()`** — uses PerfMonitor recommendations to auto-adjust `maxAgeDays` and `maxCount`
+- **Config: `perfSlowMs` / `perfCriticalMs`** — configurable thresholds (defaults: 100ms / 500ms)
+
+#### How It Works
+```
+Queries fast (p95 < 100ms)   → GC relaxed: keep 30 days, 50 snapshots
+Queries slow (100ms ~ 500ms) → GC tightens: proportionally reduce retention
+Queries critical (p95 > 500ms) → GC aggressive: 3x reduction (10 days, 16 snapshots)
+```
+
+#### Why This Matters
+Community feedback (via ninadpathak): _"handoff chains quietly explode your db size after a week of real use."_ This update ties GC directly to performance reality — storage stays lean without manual intervention.
+
+---
+
+
 
 ### StorageAdapter — Unified Backend Interface
 

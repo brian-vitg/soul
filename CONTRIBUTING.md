@@ -14,19 +14,19 @@ Thank you for your interest in contributing to Soul!
 
 1. Fork the repository
 2. Clone your fork:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/soul.git
-   cd soul
-   ```
+ ```bash
+ git clone https://github.com/YOUR_USERNAME/soul.git
+ cd soul
+ ```
 3. Install dependencies:
-   ```bash
-   npm install
-   ```
+ ```bash
+ npm install
+ ```
 4. Build and verify:
-   ```bash
-   npm run verify
-   ```
-   This runs `tsc --noEmit` (type check) + `tsc` (build) + `node --test` (30 tests).
+ ```bash
+ npm run verify
+ ```
+ This runs `tsc --noEmit` (type check) + `tsc` (build) + `node --test` (30 tests).
 
 ## How to Contribute
 
@@ -45,22 +45,22 @@ Thank you for your interest in contributing to Soul!
 ### Submitting Code
 
 1. Create a feature branch:
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
+ ```bash
+ git checkout -b feature/amazing-feature
+ ```
 2. Make your changes in `src/`
 3. Run the full verification pipeline:
-   ```bash
-   npm run verify
-   ```
+ ```bash
+ npm run verify
+ ```
 4. Commit with [Conventional Commits](https://www.conventionalcommits.org/):
-   ```bash
-   git commit -m 'feat: add amazing feature'
-   ```
+ ```bash
+ git commit -m 'feat: add amazing feature'
+ ```
 5. Push and open a Pull Request:
-   ```bash
-   git push origin feature/amazing-feature
-   ```
+ ```bash
+ git push origin feature/amazing-feature
+ ```
 
 ## Code Guidelines
 
@@ -68,34 +68,34 @@ Thank you for your interest in contributing to Soul!
 
 ```
 soul/
-├── src/                          # TypeScript source (strict mode)
-│   ├── index.ts                  # Entry point (MCP server setup)
-│   ├── types.ts                  # Shared type definitions
-│   ├── lib/                      # Core libraries
-│   │   ├── config.ts             # Config loader (default + local deep merge)
-│   │   ├── config.default.ts     # Default settings (shipped)
-│   │   ├── soul-engine.ts        # Core engine
-│   │   ├── core-memory.ts        # Core Memory (per-agent facts)
-│   │   ├── entity-memory.ts      # Entity Memory (auto-tracked)
-│   │   ├── intercom-log.ts       # Inter-agent communication logs
-│   │   ├── utils.ts              # Shared utilities
-│   │   └── kv-cache/             # KV-Cache subsystem
-│   │       ├── index.ts          # KV-Cache manager
-│   │       ├── backup.ts         # Backup/restore
-│   │       ├── embedding.ts      # Ollama embeddings
-│   │       ├── snapshot.ts       # Snapshot operations
-│   │       ├── sqlite-store.ts   # SQLite backend
-│   │       └── tier-manager.ts   # Hot/Warm/Cold tiers
-│   ├── tools/                    # MCP tool registrations
-│   │   ├── brain.ts              # n2_brain_read/write, n2_entity_*, n2_core_*
-│   │   └── kv-cache.ts           # n2_kv_save/load/search/backup/restore/gc
-│   ├── sequences/                # Agent lifecycle
-│   │   ├── boot.ts               # n2_boot
-│   │   ├── work.ts               # n2_work_start, n2_work_claim, n2_work_log
-│   │   └── end.ts                # n2_work_end
-│   └── tests/                    # Unit tests (node:test)
-├── dist/                         # Compiled output (gitignored)
-└── data/                         # Runtime data (gitignored, auto-created)
+├── src/ # TypeScript source (strict mode)
+│ ├── index.ts # Entry point (MCP server setup)
+│ ├── types.ts # Shared type definitions
+│ ├── lib/ # Core libraries
+│ │ ├── config.ts # Config loader (default + local deep merge)
+│ │ ├── config.default.ts # Default settings (shipped)
+│ │ ├── soul-engine.ts # Core engine
+│ │ ├── core-memory.ts # Core Memory (per-agent facts)
+│ │ ├── entity-memory.ts # Entity Memory (auto-tracked)
+│ │ ├── intercom-log.ts # Inter-agent communication logs
+│ │ ├── utils.ts # Shared utilities
+│ │ └── kv-cache/ # KV-Cache subsystem
+│ │ ├── index.ts # KV-Cache manager
+│ │ ├── backup.ts # Backup/restore
+│ │ ├── embedding.ts # Ollama embeddings
+│ │ ├── snapshot.ts # Snapshot operations
+│ │ ├── sqlite-store.ts # SQLite backend
+│ │ └── tier-manager.ts # Hot/Warm/Cold tiers
+│ ├── tools/ # MCP tool registrations
+│ │ ├── brain.ts # n2_brain_read/write, n2_entity_*, n2_core_*
+│ │ └── kv-cache.ts # n2_kv_save/load/search/backup/restore/gc
+│ ├── sequences/ # Agent lifecycle
+│ │ ├── boot.ts # n2_boot
+│ │ ├── work.ts # n2_work_start, n2_work_claim, n2_work_log
+│ │ └── end.ts # n2_work_end
+│ └── tests/ # Unit tests (node:test)
+├── dist/ # Compiled output (gitignored)
+└── data/ # Runtime data (gitignored, auto-created)
 ```
 
 ### Style
@@ -113,12 +113,12 @@ soul/
 
 1. Create or edit a file in `src/tools/`
 2. Register the tool using the MCP SDK pattern:
-   ```typescript
-   server.tool('n2_your_tool', 'Description', { /* zod schema */ }, async (params) => {
-       // implementation
-       return { content: [{ type: 'text', text: 'result' }] };
-   });
-   ```
+ ```typescript
+ server.tool('n2_your_tool', 'Description', { /* zod schema */ }, async (params) => {
+ // implementation
+ return { content: [{ type: 'text', text: 'result' }] };
+ });
+ ```
 3. If it's a new file, import and register it in `src/index.ts`
 4. Add corresponding tests in `src/tests/`
 

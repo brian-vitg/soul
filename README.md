@@ -575,7 +575,7 @@ Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## Star History
 
-No coffee? A star is fine too →⭐
+If Soul helped you, a star would be appreciated.
 
 ---
 

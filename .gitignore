@@ -14,3 +14,9 @@ data/kv-cache/
 
 # Node
 node_modules/
+
+# Internal docs (never publish)
+PLAN.md
+task.md
+walkthrough.md
+implementation_plan.md

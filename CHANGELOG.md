@@ -15,7 +15,7 @@ All notable changes to Soul are documented here.
 
 ## [9.0.0] — 2026-03-26
 
-### 🔒 Strict TypeScript Migration
+### Strict TypeScript Migration
 
 Soul is now fully written in **TypeScript strict mode** with zero `any` usage.
 
@@ -49,7 +49,7 @@ Soul is now fully written in **TypeScript strict mode** with zero `any` usage.
 
 ## [8.0.0] — 2026-03-26
 
-### 🧠 Forgetting Curve — Intelligent Memory
+### Forgetting Curve — Intelligent Memory
 
 Soul now remembers what matters and forgets what doesn't, inspired by Ebbinghaus' forgetting curve.
 
@@ -70,7 +70,7 @@ Soul now remembers what matters and forgets what doesn't, inspired by Ebbinghaus
 
 ## [7.0.0] — 2026-03
 
-### 🕸️ Arachne — Code Context Assembly
+### Arachne — Code Context Assembly
 
 > **Note**: Arachne has been separated into its own package [`n2-arachne`](https://github.com/choihyunsus/n2-arachne) as of v8.0.
 
@@ -82,7 +82,7 @@ Soul now remembers what matters and forgets what doesn't, inspired by Ebbinghaus
 
 ## [6.0.0] — 2026-03
 
-### 🛡️ Ark — AI Safety System
+### Ark — AI Safety System
 
 > **Note**: Ark has been separated into its own package [`n2-ark`](https://github.com/choihyunsus/n2-ark) as of v8.0.
 
@@ -95,7 +95,7 @@ Soul now remembers what matters and forgets what doesn't, inspired by Ebbinghaus
 
 ## [5.0.0] — 2026-02
 
-### 🏷️ Entity & Core Memory
+### Entity & Core Memory
 
 - **Entity Memory** — auto-track people, hardware, projects, concepts
 - **Core Memory** — per-agent always-loaded facts
@@ -106,7 +106,7 @@ Soul now remembers what matters and forgets what doesn't, inspired by Ebbinghaus
 
 ## [4.0.0] — 2026-01
 
-### 📋 Soul Board & Ledger
+### Soul Board & Ledger
 
 - **Soul Board** — project state + TODO tracking + cross-agent handoff
 - **Immutable Ledger** — append-only work logs with date-based partitioning

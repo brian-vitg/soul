@@ -45,36 +45,7 @@ interface KVBackupListInput {
   project: string;
 }
 
-/** Typed results from kvCache operations to avoid Record<string, unknown> */
-interface KVBackupResult {
-  type: string;
-  message?: string;
-  backupId?: string;
-  sizeFormatted?: string;
-  snapshots?: string | number;
-  embeddings?: string | number;
-}
-
-interface KVRestoreResult {
-  error?: string;
-  backupId?: string;
-  restored?: number;
-  embeddings?: number;
-  target?: string;
-}
-
-interface KVBackupInfo {
-  id?: string;
-  type?: string;
-  sizeFormatted?: string;
-  timestamp?: string;
-}
-
-interface KVBackupStatus {
-  totalBackups?: number;
-  totalBackupSize?: string;
-  lastBackup?: string;
-}
+// Backup types imported from ../lib/kv-cache/backup — no local duplicates needed
 
 export function registerKVCacheTools(
   server: McpToolServer,
@@ -82,10 +53,21 @@ export function registerKVCacheTools(
   config: SoulConfig,
 ): void {
   if (!config.KV_CACHE?.enabled) return;
-
   const kvCache = new SoulKVCache(config.DATA_DIR, config.KV_CACHE);
 
-  // n2_kv_save
+  _registerKVCoreTools(server, z, kvCache);
+  _registerKVMaintenanceTools(server, z, kvCache);
+  _registerKVBackupTools(server, z, kvCache);
+}
+
+/** Register n2_kv_save, n2_kv_load, n2_kv_search */
+function _registerKVCoreTools(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
+  _registerKVSave(server, z, kvCache);
+  _registerKVLoad(server, z, kvCache);
+  _registerKVSearch(server, z, kvCache);
+}
+
+function _registerKVSave(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_save',
     'Save current session as a KV-Cache snapshot. Auto-called at n2_work_end if enabled.',
@@ -101,11 +83,8 @@ export function registerKVCacheTools(
     async ({ agent, project, summary, decisions, todo, filesCreated, filesModified }: KVSaveInput) => {
       try {
         const id = await kvCache.save(agent, project, {
-          summary,
-          decisions: decisions ?? [],
-          todo: todo ?? [],
-          filesCreated: filesCreated ?? [],
-          filesModified: filesModified ?? [],
+          summary, decisions: decisions ?? [], todo: todo ?? [],
+          filesCreated: filesCreated ?? [], filesModified: filesModified ?? [],
         });
         const snapCount = (await kvCache.listSnapshots(project)).length;
         return { content: [{ type: 'text', text: `KV-Cache saved: ${id} (${snapCount} total for ${project})` }] };
@@ -115,8 +94,9 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_load
+function _registerKVLoad(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_load',
     'Load the most recent KV-Cache snapshot for a project. Returns compressed context.',
@@ -128,9 +108,7 @@ export function registerKVCacheTools(
     async ({ project, budget, level }: KVLoadInput) => {
       try {
         const snap = await kvCache.load(project, { budget, level: level ?? 'auto' });
-        if (!snap) {
-          return { content: [{ type: 'text', text: `No KV-Cache snapshots found for ${project}.` }] };
-        }
+        if (!snap) return { content: [{ type: 'text', text: `No KV-Cache snapshots found for ${project}.` }] };
         const header = `[${snap._level ?? 'auto'} | ~${snap._promptTokens ?? '?'} tokens]`;
         return { content: [{ type: 'text', text: `${header}\n${snap._resumePrompt ?? `Snapshot ${snap.id} loaded.`}` }] };
       } catch (err) {
@@ -139,8 +117,9 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_search
+function _registerKVSearch(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_search',
     'Search across KV-Cache snapshots for relevant past sessions.',
@@ -152,9 +131,7 @@ export function registerKVCacheTools(
     async ({ query, project, maxResults }: KVSearchInput) => {
       try {
         const results = await kvCache.search(query, project, maxResults ?? 5);
-        if (results.length === 0) {
-          return { content: [{ type: 'text', text: `No KV-Cache results for "${query}" in ${project}.` }] };
-        }
+        if (results.length === 0) return { content: [{ type: 'text', text: `No KV-Cache results for "${query}" in ${project}.` }] };
         const lines = results.map((r, i) => {
           const date = (r.endedAt ?? r.startedAt ?? '').split('T')[0] ?? '';
           return `${i + 1}. [${date}] ${r.agentName} | ${r.keys.slice(0, 5).join(', ')}\n   ${(r.context?.summary ?? '').slice(0, 150)}`;
@@ -166,8 +143,10 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_gc
+/** Register n2_kv_gc */
+function _registerKVMaintenanceTools(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_gc',
     'Remove old KV-Cache snapshots. Uses config defaults if no args.',
@@ -186,8 +165,16 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_backup
+/** Register n2_kv_backup, n2_kv_restore, n2_kv_backup_list */
+function _registerKVBackupTools(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
+  _registerKVBackup(server, z, kvCache);
+  _registerKVRestore(server, z, kvCache);
+  _registerKVBackupList(server, z, kvCache);
+}
+
+function _registerKVBackup(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_backup',
     'Backup KV-Cache data to a portable SQLite DB. Supports incremental backups.',
@@ -197,22 +184,13 @@ export function registerKVCacheTools(
     },
     async ({ project, full }: KVBackupInput) => {
       try {
-        const result = await kvCache.backup(project, { full }) as unknown as KVBackupResult;
-        if (result.type === 'skip') {
-          return { content: [{ type: 'text', text: `KV-Cache backup skipped: ${result.message ?? ''}` }] };
-        }
-        if (result.type === 'empty') {
-          return { content: [{ type: 'text', text: `KV-Cache backup: no data for ${project}.` }] };
-        }
-        const bId = result.backupId ?? '';
-        const bType = result.type;
-        const bSize = result.sizeFormatted ?? '';
-        const bSnaps = String(result.snapshots ?? 'copied');
-        const bEmbs = String(result.embeddings ?? 'included');
+        const result = await kvCache.backup(project, { full });
+        if (result.type === 'skip') return { content: [{ type: 'text', text: `KV-Cache backup skipped: ${result.message ?? ''}` }] };
+        if (result.type === 'empty') return { content: [{ type: 'text', text: `KV-Cache backup: no data for ${project}.` }] };
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache backup created: ${bId}\nType: ${bType} | Size: ${bSize}\nSnapshots: ${bSnaps} | Embeddings: ${bEmbs}`,
+            text: `KV-Cache backup created: ${result.backupId ?? ''}\nType: ${result.type} | Size: ${result.sizeFormatted ?? ''}\nSnapshots: ${String(result.snapshots ?? 'copied')} | Embeddings: ${String(result.embeddings ?? 'included')}`,
           }],
         };
       } catch (err) {
@@ -221,8 +199,9 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_restore
+function _registerKVRestore(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_restore',
     'Restore KV-Cache data from a backup DB.',
@@ -233,18 +212,12 @@ export function registerKVCacheTools(
     },
     async ({ project, backupId, target }: KVRestoreInput) => {
       try {
-        const result = await kvCache.restore(project, backupId, { target: target as 'json' | 'sqlite' | undefined }) as unknown as KVRestoreResult;
-        if (result.error) {
-          return { content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
-        }
-        const rId = result.backupId ?? '';
-        const rRestored = String(result.restored ?? 0);
-        const rEmbs = String(result.embeddings ?? 0);
-        const rTarget = result.target ?? 'json';
+        const result = await kvCache.restore(project, backupId, { target: target as 'json' | 'sqlite' | undefined });
+        if (result.error) return { content: [{ type: 'text', text: `KV-Cache restore error: ${result.error}` }] };
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache restored from ${rId}: ${rRestored} snapshots, ${rEmbs} embeddings (target: ${rTarget})`,
+            text: `KV-Cache restored from ${result.backupId ?? ''}: ${String(result.restored ?? 0)} snapshots, ${String(result.embeddings ?? 0)} embeddings (target: ${result.target ?? 'json'})`,
           }],
         };
       } catch (err) {
@@ -253,8 +226,9 @@ export function registerKVCacheTools(
       }
     },
   );
+}
 
-  // n2_kv_backup_list
+function _registerKVBackupList(server: McpToolServer, z: typeof ZodType, kvCache: SoulKVCache): void {
   server.tool(
     'n2_kv_backup_list',
     'List KV-Cache backup history for a project.',
@@ -263,25 +237,17 @@ export function registerKVCacheTools(
     },
     async ({ project }: KVBackupListInput) => {
       try {
-        const backups = kvCache.listBackups(project) as unknown as KVBackupInfo[];
-        if (backups.length === 0) {
-          return { content: [{ type: 'text', text: `No backups for ${project}.` }] };
-        }
-        const status = kvCache.backupStatus(project) as unknown as KVBackupStatus;
+        const backups = kvCache.listBackups(project);
+        if (backups.length === 0) return { content: [{ type: 'text', text: `No backups for ${project}.` }] };
+        const status = kvCache.backupStatus(project);
         const lines = backups.map((b, i) => {
-          const bId = b.id ?? '';
-          const bType = b.type ?? '';
-          const bSize = b.sizeFormatted ?? '';
           const bTime = (b.timestamp ?? '').split('T')[0] ?? '';
-          return `${i + 1}. [${bId}] ${bType} | ${bSize} | ${bTime}`;
+          return `${i + 1}. [${b.id ?? ''}] ${b.type ?? ''} | ${b.sizeFormatted ?? ''} | ${bTime}`;
         });
-        const totalBackups = String(status.totalBackups ?? 0);
-        const totalSize = status.totalBackupSize ?? '';
-        const lastBackup = status.lastBackup ?? 'never';
         return {
           content: [{
             type: 'text',
-            text: `KV-Cache backups for ${project}: ${totalBackups} total (${totalSize})\nLast: ${lastBackup}\n\n${lines.join('\n')}`,
+            text: `KV-Cache backups for ${project}: ${String(status.totalBackups ?? 0)} total (${status.totalBackupSize ?? ''})\nLast: ${status.lastBackup ?? 'never'}\n\n${lines.join('\n')}`,
           }],
         };
       } catch (err) {
@@ -291,3 +257,4 @@ export function registerKVCacheTools(
     },
   );
 }
+

@@ -1,6 +1,7 @@
 // Soul KV-Cache v9.0 — Backup/Restore engine. sqlite-store compatible DB backup.
 import path from 'path';
 import fs from 'fs';
+import { writeFile, writeJson } from '../utils';
 // SessionData types imported lazily
 
 /** Raw snapshot structure as written to JSON files */
@@ -47,7 +48,7 @@ interface BackupConfig {
   incremental?: boolean;
 }
 
-interface ManifestEntry {
+export interface ManifestEntry {
   id: string;
   type: string;
   timestamp: string;
@@ -61,7 +62,7 @@ interface Manifest {
   lastBackup: string | null;
 }
 
-interface BackupResult {
+export interface BackupResult {
   backupId: string | null;
   snapshots?: number;
   embeddings?: number;
@@ -73,7 +74,7 @@ interface BackupResult {
   error?: string;
 }
 
-interface RestoreResult {
+export interface RestoreResult {
   restored: number | string;
   embeddings?: number;
   backupId?: string;
@@ -83,6 +84,14 @@ interface RestoreResult {
 
 interface RestoreOptions {
   target?: 'sqlite' | 'json';
+}
+
+export interface BackupStatusResult {
+  project: string;
+  totalBackups: number;
+  lastBackup: string | null;
+  totalBackupSize: string;
+  keepCount: number;
 }
 
 interface BackupOptions {
@@ -159,20 +168,11 @@ export class BackupManager {
   ): Promise<BackupResult> {
     const SQL = await this._initSql();
     const snapDir = path.join(this.dataDir, 'kv-cache', 'snapshots', project);
-
     if (!fs.existsSync(snapDir)) {
       return { backupId: null, snapshots: 0, sizeBytes: 0, type: 'empty', error: 'No snapshots' };
     }
 
-    const snapFiles: string[] = [];
-    const scanDir = (dir: string): void => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.isDirectory()) scanDir(path.join(dir, entry.name));
-        else if (entry.name.endsWith('.json')) snapFiles.push(path.join(dir, entry.name));
-      }
-    };
-    scanDir(snapDir);
-
+    const snapFiles = this._collectSnapFiles(snapDir);
     if (snapFiles.length === 0) {
       return { backupId: null, snapshots: 0, sizeBytes: 0, type: 'empty', error: 'No snapshots' };
     }
@@ -188,62 +188,9 @@ export class BackupManager {
     }
 
     const db = new SQL.Database();
-    db.run(`
-      CREATE TABLE IF NOT EXISTS snapshots (
-        id TEXT PRIMARY KEY, agent_name TEXT NOT NULL, agent_type TEXT DEFAULT 'external',
-        model TEXT, started_at TEXT, ended_at TEXT, turn_count INTEGER DEFAULT 0,
-        token_estimate INTEGER DEFAULT 0, keys TEXT DEFAULT '[]', context TEXT DEFAULT '{}',
-        parent_session_id TEXT, project_name TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now'))
-      )
-    `);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_name, ended_at DESC)`);
-    db.run(`CREATE TABLE IF NOT EXISTS embeddings (snapshot_id TEXT PRIMARY KEY, vector BLOB NOT NULL)`);
-
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO snapshots
-      (id, agent_name, agent_type, model, started_at, ended_at,
-       turn_count, token_estimate, keys, context, parent_session_id, project_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    let snapCount = 0;
-    try {
-      for (const filePath of snapFiles) {
-        try {
-          const raw = fs.readFileSync(filePath, 'utf-8');
-          const s = JSON.parse(raw) as SnapshotRaw;
-          stmt.run([
-            s.id ?? '', s.agentName ?? 'unknown', s.agentType ?? 'external',
-            s.model ?? null, s.startedAt ?? null,
-            s.endedAt ?? null, s.turnCount ?? 0, s.tokenEstimate ?? 0,
-            JSON.stringify(s.keys ?? []), JSON.stringify(s.context ?? {}),
-            s.parentSessionId ?? null, s.projectName ?? project,
-          ]);
-          snapCount++;
-        } catch { /* skip corrupt */ }
-      }
-    } finally {
-      stmt.free();
-    }
-
-    // Embeddings backup
-    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
-    let embCount = 0;
-    if (fs.existsSync(embDir)) {
-      const embStmt = db.prepare('INSERT OR REPLACE INTO embeddings (snapshot_id, vector) VALUES (?, ?)');
-      try {
-        for (const file of fs.readdirSync(embDir).filter(f => f.endsWith('.json'))) {
-          try {
-            const vec = fs.readFileSync(path.join(embDir, file), 'utf-8');
-            embStmt.run([path.basename(file, '.json'), vec]);
-            embCount++;
-          } catch { /* skip */ }
-        }
-      } finally {
-        embStmt.free();
-      }
-    }
+    this._initBackupSchema(db);
+    const snapCount = this._insertSnapshotsIntoDb(db, snapFiles, project);
+    const embCount = this._insertEmbeddingsIntoDb(db, project);
 
     const backupId = this._makeBackupId();
     const destPath = path.join(this.backupDir, project, `backup-${backupId}.sqlite`);
@@ -268,6 +215,80 @@ export class BackupManager {
     };
   }
 
+  /** Recursively collect JSON snapshot files */
+  private _collectSnapFiles(dir: string): string[] {
+    const files: string[] = [];
+    const scan = (d: string): void => {
+      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+        if (entry.isDirectory()) scan(path.join(d, entry.name));
+        else if (entry.name.endsWith('.json')) files.push(path.join(d, entry.name));
+      }
+    };
+    scan(dir);
+    return files;
+  }
+
+  /** Initialize backup DB schema */
+  private _initBackupSchema(db: SqlJsDatabase): void {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS snapshots (
+        id TEXT PRIMARY KEY, agent_name TEXT NOT NULL, agent_type TEXT DEFAULT 'external',
+        model TEXT, started_at TEXT, ended_at TEXT, turn_count INTEGER DEFAULT 0,
+        token_estimate INTEGER DEFAULT 0, keys TEXT DEFAULT '[]', context TEXT DEFAULT '{}',
+        parent_session_id TEXT, project_name TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_name, ended_at DESC)`);
+    db.run(`CREATE TABLE IF NOT EXISTS embeddings (snapshot_id TEXT PRIMARY KEY, vector BLOB NOT NULL)`);
+  }
+
+  /** Insert snapshots from JSON files into backup DB */
+  private _insertSnapshotsIntoDb(db: SqlJsDatabase, snapFiles: string[], project: string): number {
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO snapshots
+      (id, agent_name, agent_type, model, started_at, ended_at,
+       turn_count, token_estimate, keys, context, parent_session_id, project_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    let count = 0;
+    try {
+      for (const filePath of snapFiles) {
+        try {
+          const raw = fs.readFileSync(filePath, 'utf-8');
+          const s = JSON.parse(raw) as SnapshotRaw;
+          stmt.run([
+            s.id ?? '', s.agentName ?? 'unknown', s.agentType ?? 'external',
+            s.model ?? null, s.startedAt ?? null,
+            s.endedAt ?? null, s.turnCount ?? 0, s.tokenEstimate ?? 0,
+            JSON.stringify(s.keys ?? []), JSON.stringify(s.context ?? {}),
+            s.parentSessionId ?? null, s.projectName ?? project,
+          ]);
+          count++;
+        } catch { /* skip corrupt */ }
+      }
+    } finally { stmt.free(); }
+    return count;
+  }
+
+  /** Insert embeddings into backup DB */
+  private _insertEmbeddingsIntoDb(db: SqlJsDatabase, project: string): number {
+    const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
+    if (!fs.existsSync(embDir)) return 0;
+    let count = 0;
+    const stmt = db.prepare('INSERT OR REPLACE INTO embeddings (snapshot_id, vector) VALUES (?, ?)');
+    try {
+      for (const file of fs.readdirSync(embDir).filter(f => f.endsWith('.json'))) {
+        try {
+          const vec = fs.readFileSync(path.join(embDir, file), 'utf-8');
+          stmt.run([path.basename(file, '.json'), vec]);
+          count++;
+        } catch { /* skip */ }
+      }
+    } finally { stmt.free(); }
+    return count;
+  }
+
   /** Restore from backup */
   async restore(project: string, backupId?: string | null, options: RestoreOptions = {}): Promise<RestoreResult> {
     const manifest = this._loadManifest(project);
@@ -279,9 +300,7 @@ export class BackupManager {
     const dbPath = path.join(this.backupDir, project, `backup-${backupId}.sqlite`);
     if (!fs.existsSync(dbPath)) return { error: `Backup not found: ${backupId}`, restored: 0 };
 
-    const target = options.target || 'json';
-
-    if (target === 'sqlite') {
+    if ((options.target || 'json') === 'sqlite') {
       const destDir = path.join(this.dataDir, 'kv-cache', 'sqlite');
       if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
       fs.copyFileSync(dbPath, path.join(destDir, `${project}.sqlite`));
@@ -292,10 +311,19 @@ export class BackupManager {
     const dbData = fs.readFileSync(dbPath);
     const db = new SQL.Database(dbData);
 
+    const restoredSnaps = this._restoreSnapshots(db, project);
+    const restoredEmbs = this._restoreEmbeddings(db, project);
+    db.close();
+
+    return { restored: restoredSnaps, embeddings: restoredEmbs, backupId, target: 'json' };
+  }
+
+  /** Restore snapshots from backup DB to JSON files */
+  private _restoreSnapshots(db: SqlJsDatabase, project: string): number {
     const snapDir = path.join(this.dataDir, 'kv-cache', 'snapshots', project);
     if (!fs.existsSync(snapDir)) fs.mkdirSync(snapDir, { recursive: true });
 
-    let restoredSnaps = 0;
+    let count = 0;
     const snapRows = db.exec('SELECT * FROM snapshots');
     if (snapRows.length > 0 && snapRows[0]) {
       const cols = snapRows[0].columns;
@@ -310,28 +338,29 @@ export class BackupManager {
           context: JSON.parse(String(obj.context ?? '{}')) as Record<string, unknown>,
           parentSessionId: obj.parent_session_id, projectName: obj.project_name,
         };
-        // M5 fix: write to date-dir structure so SnapshotEngine.list() can find them
         const dateStr = (String(session.endedAt || session.startedAt || '')).split('T')[0] || '1970-01-01';
         const dateDir = path.join(snapDir, dateStr);
         if (!fs.existsSync(dateDir)) fs.mkdirSync(dateDir, { recursive: true });
-        fs.writeFileSync(path.join(dateDir, `${String(session.id)}.json`), JSON.stringify(session, null, 2));
-        restoredSnaps++;
+        writeFile(path.join(dateDir, `${String(session.id)}.json`), JSON.stringify(session, null, 2));
+        count++;
       }
     }
+    return count;
+  }
 
+  /** Restore embeddings from backup DB to JSON files */
+  private _restoreEmbeddings(db: SqlJsDatabase, project: string): number {
     const embDir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
     if (!fs.existsSync(embDir)) fs.mkdirSync(embDir, { recursive: true });
-    let restoredEmbs = 0;
+    let count = 0;
     const embRows = db.exec('SELECT snapshot_id, vector FROM embeddings');
     if (embRows.length > 0 && embRows[0]) {
       for (const row of embRows[0].values) {
-        fs.writeFileSync(path.join(embDir, `${String(row[0])}.json`), String(row[1]));
-        restoredEmbs++;
+        writeFile(path.join(embDir, `${String(row[0])}.json`), String(row[1]));
+        count++;
       }
     }
-
-    db.close();
-    return { restored: restoredSnaps, embeddings: restoredEmbs, backupId, target: 'json' };
+    return count;
   }
 
   /** List backup history */
@@ -342,7 +371,7 @@ export class BackupManager {
   }
 
   /** Backup status summary */
-  status(project: string): Record<string, unknown> {
+  status(project: string): BackupStatusResult {
     const manifest = this._loadManifest(project);
     const totalSize = manifest.backups.reduce((s, b) => s + (b.sizeBytes || 0), 0);
     return {
@@ -384,7 +413,7 @@ export class BackupManager {
   private _saveManifest(project: string, manifest: Manifest): void {
     const dir = path.join(this.backupDir, project);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+    writeJson(path.join(dir, 'manifest.json'), manifest);
   }
 
   private _formatBytes(bytes: number): string {

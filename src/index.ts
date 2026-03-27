@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import config from './lib/config';
+import { SoulEngine } from './lib/soul-engine';
 import { registerBootSequence } from './sequences/boot';
 import { registerWorkSequence, disposeWorkSequence } from './sequences/work';
 import { registerEndSequence } from './sequences/end';
@@ -12,12 +13,13 @@ import { registerKVCacheTools } from './tools/kv-cache';
 import type { McpToolServer } from './types';
 import pkg from '../package.json';
 
-const server = new McpServer({ name: 'n2-soul', version: pkg.version }) as unknown as McpToolServer & { connect: (transport: unknown) => Promise<void> };
+const server = new McpServer({ name: 'n2-soul', version: pkg.version }) as McpToolServer;
+const engine = new SoulEngine(config.DATA_DIR);
 
-// Register core modules
-registerBootSequence(server, z, config);
-registerWorkSequence(server, z, config);
-registerEndSequence(server, z, config);
+// Register core modules (shared SoulEngine instance)
+registerBootSequence(server, z, config, engine);
+registerWorkSequence(server, z, config, engine);
+registerEndSequence(server, z, config, engine);
 registerBrainTools(server, z, config);
 registerKVCacheTools(server, z, config);
 

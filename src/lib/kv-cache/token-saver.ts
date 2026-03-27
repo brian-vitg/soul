@@ -19,51 +19,32 @@ export const LEVELS: Record<string, LevelSpec> = {
   L3: { name: 'full', maxTokens: Infinity },
 };
 
-/** Extracts context from a snapshot at the specified progressive level */
-export function extractAtLevel(snapshot: SessionData | null, level: string = 'L2'): LoadResult {
-  if (!snapshot) return { level, tokens: 0, prompt: '' };
-
-  const spec = LEVELS[level] ?? LEVELS['L2'] ?? { name: 'standard', maxTokens: 2000 };
+/** Build L1 (minimal) context lines */
+function _buildL1Lines(snapshot: SessionData): string[] {
   const lines: string[] = [];
-
-  // L1: Minimal (keywords + TODO)
   lines.push(`[Session: ${snapshot.agentName} | ${(snapshot.endedAt || snapshot.startedAt || '').split('T')[0]}]`);
-
   if (snapshot.parentSessionId) {
     lines.push(`Chain: ${snapshot.parentSessionId.slice(0, 8)} -> ${snapshot.id.slice(0, 8)}`);
   }
-  if (snapshot.keys?.length > 0) {
-    lines.push(`Topics: ${snapshot.keys.slice(0, 10).join(', ')}`);
-  }
+  if (snapshot.keys?.length > 0) lines.push(`Topics: ${snapshot.keys.slice(0, 10).join(', ')}`);
   if (snapshot.context?.todo?.length > 0) {
     lines.push('TODO:');
     for (const t of snapshot.context.todo) lines.push(`  - ${t}`);
   }
+  return lines;
+}
 
-  let prompt = lines.join('\n');
-  let tokens = estimateTokenCount(prompt);
-
-  if (level === 'L1' || tokens >= spec.maxTokens) {
-    return trimToTokenBudget(prompt, tokens, spec.maxTokens, 'L1');
-  }
-
-  // L2: Standard (+ summary + decisions)
+/** Build L2 (standard) context lines */
+function _buildL2Lines(snapshot: SessionData, lines: string[]): void {
   if (snapshot.context?.decisions?.length > 0) {
     lines.push('Decisions:');
     for (const d of snapshot.context.decisions) lines.push(`  - ${d}`);
   }
-  if (snapshot.context?.summary) {
-    lines.push(`Summary: ${snapshot.context.summary}`);
-  }
+  if (snapshot.context?.summary) lines.push(`Summary: ${snapshot.context.summary}`);
+}
 
-  prompt = lines.join('\n');
-  tokens = estimateTokenCount(prompt);
-
-  if (level === 'L2' || tokens >= spec.maxTokens) {
-    return trimToTokenBudget(prompt, tokens, spec.maxTokens, 'L2');
-  }
-
-  // L3: Full (+ files changed + metadata)
+/** Build L3 (full) context lines */
+function _buildL3Lines(snapshot: SessionData, lines: string[]): void {
   if (snapshot.context?.filesChanged?.length > 0) {
     lines.push('Files changed:');
     for (const f of snapshot.context.filesChanged) {
@@ -71,15 +52,30 @@ export function extractAtLevel(snapshot: SessionData | null, level: string = 'L2
       lines.push(`  - ${entry}`);
     }
   }
-
   lines.push(`Agent type: ${snapshot.agentType || 'unknown'}`);
   if (snapshot.model) lines.push(`Model: ${snapshot.model}`);
   if (snapshot.turnCount) lines.push(`Turns: ${snapshot.turnCount}`);
   if (snapshot.tokenEstimate) lines.push(`Token estimate: ${snapshot.tokenEstimate}`);
+}
 
+/** Extracts context from a snapshot at the specified progressive level */
+export function extractAtLevel(snapshot: SessionData | null, level: string = 'L2'): LoadResult {
+  if (!snapshot) return { level, tokens: 0, prompt: '' };
+
+  const spec = LEVELS[level] ?? LEVELS['L2'] ?? { name: 'standard', maxTokens: 2000 };
+  const lines = _buildL1Lines(snapshot);
+  let prompt = lines.join('\n');
+  let tokens = estimateTokenCount(prompt);
+  if (level === 'L1' || tokens >= spec.maxTokens) return trimToTokenBudget(prompt, tokens, spec.maxTokens, 'L1');
+
+  _buildL2Lines(snapshot, lines);
   prompt = lines.join('\n');
   tokens = estimateTokenCount(prompt);
+  if (level === 'L2' || tokens >= spec.maxTokens) return trimToTokenBudget(prompt, tokens, spec.maxTokens, 'L2');
 
+  _buildL3Lines(snapshot, lines);
+  prompt = lines.join('\n');
+  tokens = estimateTokenCount(prompt);
   return { level: 'L3', tokens, prompt };
 }
 

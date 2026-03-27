@@ -1,7 +1,7 @@
 // Soul KV-Cache v9.0 — Orchestrator. Coordinates snapshot, compressor, and adapter.
 import path from 'path';
 import fs from 'fs';
-import { logError, logWarn, logInfo } from '../utils';
+import { logError, logWarn, logInfo, writeFile } from '../utils';
 import { SnapshotEngine } from './snapshot';
 import { compress } from './compressor';
 import { fromMcpSession } from './agent-adapter';
@@ -9,6 +9,7 @@ import { extractAtLevel, autoLevel } from './token-saver';
 import { TierManager } from './tier-manager';
 import { EmbeddingEngine } from './embedding';
 import { BackupManager } from './backup';
+import type { BackupResult, RestoreResult, ManifestEntry, BackupStatusResult } from './backup';
 import type { SessionData } from './schema';
 import type { KVCacheConfig } from '../../types';
 
@@ -41,10 +42,14 @@ interface KVCacheInternalConfig {
   };
 }
 
-interface BackupResultLike {
-  type: string;
-  sizeFormatted?: string;
-}
+// BackupResult type imported from ./backup — no local duplicate needed
+
+const DEFAULT_COMPRESSION_TARGET = 1000;
+const AUTO_BACKUP_DELAY_MS = 5 * 60 * 1000;
+const DEFAULT_MAX_SNAPSHOTS = 50;
+const DEFAULT_MAX_AGE_DAYS = 30;
+const DEFAULT_BOOT_TOKEN_BUDGET = 2000;
+const DEFAULT_SEARCH_TOKEN_BUDGET = 500;
 
 /** Creates the appropriate storage engine based on config */
 function createStorageEngine(
@@ -116,11 +121,11 @@ export class SoulKVCache {
     this.dataDir = dataDir;
     this.config = {
       backend: config.backend || 'json',
-      compressionTarget: config.compressionTarget || 1000,
-      maxSnapshotsPerProject: config.maxSnapshotsPerProject || 50,
-      maxSnapshotAgeDays: config.maxSnapshotAgeDays || 30,
+      compressionTarget: config.compressionTarget || DEFAULT_COMPRESSION_TARGET,
+      maxSnapshotsPerProject: config.maxSnapshotsPerProject || DEFAULT_MAX_SNAPSHOTS,
+      maxSnapshotAgeDays: config.maxSnapshotAgeDays || DEFAULT_MAX_AGE_DAYS,
       tokenBudget: config.tokenBudget || {
-        bootContext: 2000, searchResult: 500, progressiveLoad: true,
+        bootContext: DEFAULT_BOOT_TOKEN_BUDGET, searchResult: DEFAULT_SEARCH_TOKEN_BUDGET, progressiveLoad: true,
       },
     };
 
@@ -129,7 +134,7 @@ export class SoulKVCache {
     this._embeddingReady = false;
     const embConfig = config.embedding;
     if (embConfig?.enabled) {
-      this.embedding = new EmbeddingEngine(embConfig as unknown as ConstructorParameters<typeof EmbeddingEngine>[0]);
+      this.embedding = new EmbeddingEngine({ model: embConfig.model, endpoint: embConfig.endpoint ?? undefined });
       this.embedding.isAvailable().then(ok => {
         this._embeddingReady = ok;
         if (ok && this.embedding) {
@@ -146,7 +151,11 @@ export class SoulKVCache {
     this._delayTimer = null;
     const backupConfig = config.backup;
     if (backupConfig?.enabled) {
-      this._backup = new BackupManager(dataDir, backupConfig as unknown as ConstructorParameters<typeof BackupManager>[1]);
+      this._backup = new BackupManager(dataDir, {
+        dir: backupConfig.dir ?? undefined,
+        keepCount: backupConfig.keepCount,
+        incremental: backupConfig.incremental,
+      });
       const schedule = backupConfig.schedule || 'daily';
       if (schedule !== 'manual') {
         const intervalMs = schedule === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
@@ -160,7 +169,7 @@ export class SoulKVCache {
           if (this._backupTimer && 'unref' in this._backupTimer) {
             (this._backupTimer).unref();
           }
-        }, 5 * 60 * 1000);
+        }, AUTO_BACKUP_DELAY_MS);
         if (this._delayTimer && 'unref' in this._delayTimer) {
           (this._delayTimer).unref();
         }
@@ -302,7 +311,7 @@ export class SoulKVCache {
   private _storeEmbedding(project: string, snapshotId: string, vector: number[]): void {
     const dir = path.join(this.dataDir, 'kv-cache', 'embeddings', project);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `${snapshotId}.json`), JSON.stringify(vector));
+    writeFile(path.join(dir, `${snapshotId}.json`), JSON.stringify(vector));
   }
 
   private _loadEmbedding(project: string, snapshotId: string): number[] | null {
@@ -317,29 +326,29 @@ export class SoulKVCache {
   }
 
   /** Backup project data */
-  async backup(project: string, options: { full?: boolean } = {}): Promise<Record<string, unknown>> {
+  async backup(project: string, options: { full?: boolean } = {}): Promise<BackupResult> {
     if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
-    return this._backup.backup(project, options) as unknown as Promise<Record<string, unknown>>;
+    return this._backup.backup(project, options);
   }
 
   /** Restore from backup */
   async restore(
     project: string, backupId?: string | null, options: { target?: 'sqlite' | 'json' } = {},
-  ): Promise<Record<string, unknown>> {
+  ): Promise<RestoreResult> {
     if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
-    return this._backup.restore(project, backupId, options) as unknown as Promise<Record<string, unknown>>;
+    return this._backup.restore(project, backupId, options);
   }
 
   /** List backup history for a project */
-  listBackups(project: string): Array<Record<string, unknown>> {
+  listBackups(project: string): (ManifestEntry & { sizeFormatted: string })[] {
     if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
-    return this._backup.list(project) as unknown as Array<Record<string, unknown>>;
+    return this._backup.list(project);
   }
 
   /** Backup status for a project */
-  backupStatus(project: string): Record<string, unknown> {
+  backupStatus(project: string): BackupStatusResult {
     if (!this._backup) this._backup = new BackupManager(this.dataDir, {});
-    return this._backup.status(project) as unknown as Record<string, unknown>;
+    return this._backup.status(project);
   }
 
   private async _runAutoBackup(): Promise<void> {
@@ -353,7 +362,7 @@ export class SoulKVCache {
 
       for (const project of projects) {
         try {
-          const result = await this._backup.backup(project, {}) as BackupResultLike;
+          const result = await this._backup.backup(project, {});
           if (result.type !== 'skip' && result.type !== 'empty') {
             console.error(`[kv-cache] Auto-backup: ${project} → ${result.sizeFormatted || ''} (${result.type})`);
           }

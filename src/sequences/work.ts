@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type { z as ZodType } from 'zod';
 import { nowISO, readJson, readFile, validateFirstLineComment, logError } from '../lib/utils';
-import { SoulEngine } from '../lib/soul-engine';
+import type { SoulEngine } from '../lib/soul-engine';
 import type { McpToolServer, SoulConfig, FileChange } from '../types';
 
 interface WorkSession {
@@ -34,6 +34,9 @@ export const activeSessions: Record<string, WorkSession> = {};
 // TTL: auto-expire stale sessions — initialized lazily in registerWorkSequence
 let _sessionGcTimer: ReturnType<typeof setInterval> | null = null;
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+const SESSION_GC_INTERVAL_MS = MS_PER_HOUR;
+
 /** Cleanup GC timer — call in tests or before shutdown */
 export function disposeWorkSequence(): void {
   if (_sessionGcTimer) {
@@ -43,17 +46,18 @@ export function disposeWorkSequence(): void {
 }
 
 // ── Helper: recursively walk files (with cap to prevent event loop blocking) ──
-function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: number, depth: number = 0, counter: { n: number; max: number } = { n: 0, max: 200 }): void {
-  if (depth > maxDepth || counter.n >= counter.max) return;
+function walkFiles(dir: string, callback: (filePath: string) => void, maxDepth: number, depth: number = 0, counter?: { n: number; max: number }): void {
+  const c = counter ?? { n: 0, max: 200 };
+  if (depth > maxDepth || c.n >= c.max) return;
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (counter.n >= counter.max) break;
+      if (c.n >= c.max) break;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        walkFiles(fullPath, callback, maxDepth, depth + 1, counter);
+        walkFiles(fullPath, callback, maxDepth, depth + 1, c);
       } else {
         callback(fullPath);
-        counter.n++;
+        c.n++;
       }
     }
   } catch (e) {
@@ -77,29 +81,131 @@ interface ContextSearchInput {
   semantic?: boolean;
 }
 
+interface ScoreCfg {
+  previewLen: number;
+  recencyBonus: number;
+}
+
+/** Score text against keywords and push matches to results */
+function _scoreText(
+  text: string, filePath: string, source: string,
+  keywords: string[], cfg: ScoreCfg, results: SearchResultItem[],
+  meta: Partial<SearchResultItem> = {},
+): void {
+  if (!text) return;
+  const lower = text.toLowerCase();
+  let score = 0;
+  const matchedKeywords: string[] = [];
+  for (const kw of keywords) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const count = (lower.match(new RegExp(escaped, 'g')) || []).length;
+    if (count > 0) { score += count; matchedKeywords.push(kw); }
+  }
+  if (score > 0) {
+    if (meta.timestamp) {
+      const age = (Date.now() - new Date(meta.timestamp).getTime()) / (1000 * 60 * 60 * 24);
+      score += Math.max(0, cfg.recencyBonus - age);
+    }
+    results.push({
+      source, path: filePath,
+      score: Math.round(score * 100) / 100,
+      matchedKeywords,
+      preview: text.slice(0, cfg.previewLen).replace(/\n/g, ' '),
+      ...meta,
+    });
+  }
+}
+
+/** Search brain memory directory */
+function _searchBrain(
+  dataDir: string, keywords: string[], cfg: ScoreCfg, maxDepth: number, results: SearchResultItem[],
+): void {
+  const memoryDir = path.join(dataDir, 'memory');
+  if (!fs.existsSync(memoryDir)) return;
+  walkFiles(memoryDir, (fp) => {
+    const content = readFile(fp);
+    if (content) {
+      const relPath = path.relative(memoryDir, fp);
+      _scoreText(content, `memory/${relPath}`, 'brain', keywords, cfg, results, {
+        timestamp: fs.statSync(fp).mtime.toISOString(),
+      });
+    }
+  }, maxDepth);
+}
+
+interface LedgerEntry { title?: string; summary?: string; decisions?: string[]; completedAt?: string; startedAt?: string; agent?: string }
+
+/** Search ledger entries */
+function _searchLedger(
+  dataDir: string, keywords: string[], cfg: ScoreCfg, maxDepth: number, results: SearchResultItem[],
+): void {
+  const projectsDir = path.join(dataDir, 'projects');
+  if (!fs.existsSync(projectsDir)) return;
+  for (const proj of fs.readdirSync(projectsDir)) {
+    const ledgerBase = path.join(projectsDir, proj, 'ledger');
+    if (!fs.existsSync(ledgerBase)) continue;
+    walkFiles(ledgerBase, (fp) => {
+      if (!fp.endsWith('.json')) return;
+      const data = readJson<LedgerEntry>(fp);
+      if (!data) return;
+      const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+      const text = [data.title ?? '', data.summary ?? '', ...decisions].filter(Boolean).join(' ');
+      const relPath = path.relative(projectsDir, fp);
+      _scoreText(text, `projects/${relPath}`, 'ledger', keywords, cfg, results, {
+        timestamp: data.completedAt ?? data.startedAt ?? '',
+        agent: data.agent ?? '',
+        title: data.title ?? '',
+      });
+    }, maxDepth);
+  }
+}
+
+/** Format search results for display */
+function _formatSearchResults(query: string, top: SearchResultItem[]): string {
+  const lines = top.map((r, i) => {
+    const icon = r.source === 'brain' ? '🧠' : '📖';
+    const meta = [
+      r.title ? `"${r.title}"` : '',
+      r.agent ? `by ${r.agent}` : '',
+      `score: ${r.score}`,
+    ].filter(Boolean).join(' | ');
+    return `${i + 1}. ${icon} ${r.path}\n   ${meta}\n   Keywords: [${r.matchedKeywords.join(', ')}]\n   ${r.preview}`;
+  });
+  return `🔍 Context search: "${query}" (${top.length} results)\n\n${lines.join('\n\n')}`;
+}
+
+
 export function registerWorkSequence(
   server: McpToolServer,
   z: typeof ZodType,
   config: SoulConfig,
+  engine: SoulEngine,
 ): void {
-  const engine = new SoulEngine(config.DATA_DIR);
+  _initSessionGc(config);
+  _registerWorkStartTool(server, z, engine);
+  _registerWorkClaimTool(server, z, engine);
+  _registerWorkLogTool(server, z);
+  _registerContextSearchTool(server, z, config);
+}
 
-  // Initialize session TTL GC (uses the config passed to this function)
-  if (!_sessionGcTimer) {
-    const sessionTtlMs = (config.WORK?.sessionTtlHours ?? 24) * 60 * 60 * 1000;
-    _sessionGcTimer = setInterval(() => {
-      const now = Date.now();
-      for (const [project, session] of Object.entries(activeSessions)) {
-        if (session._createdMs && (now - session._createdMs) > sessionTtlMs) {
-          delete activeSessions[project];
-          logError('work:ttl', `Expired stale session: ${project} (agent: ${session.agent})`);
-        }
+/** Initialize session TTL garbage collector */
+function _initSessionGc(config: SoulConfig): void {
+  if (_sessionGcTimer) return;
+  const sessionTtlMs = (config.WORK?.sessionTtlHours ?? 24) * MS_PER_HOUR;
+  _sessionGcTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [project, session] of Object.entries(activeSessions)) {
+      if (session._createdMs && (now - session._createdMs) > sessionTtlMs) {
+        delete activeSessions[project];
+        logError('work:ttl', `Expired stale session: ${project} (agent: ${session.agent})`);
       }
-    }, 60 * 60 * 1000);
-    _sessionGcTimer.unref();
-  }
+    }
+  }, SESSION_GC_INTERVAL_MS);
+  _sessionGcTimer.unref();
+}
 
-  // n2_work_start
+/** Register n2_work_start tool */
+function _registerWorkStartTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine): void {
   server.tool(
     'n2_work_start',
     'Start a work sequence. Registers agent in activeWork on soul-board.',
@@ -117,8 +223,10 @@ export function registerWorkSequence(
       return { content: [{ type: 'text', text: `Work started: ${agent} on ${project} — ${task}` }] };
     },
   );
+}
 
-  // n2_work_claim
+/** Register n2_work_claim tool */
+function _registerWorkClaimTool(server: McpToolServer, z: typeof ZodType, engine: SoulEngine): void {
   server.tool(
     'n2_work_claim',
     'Claim file ownership before modifying. Prevents collision with other agents.',
@@ -136,8 +244,10 @@ export function registerWorkSequence(
       return { content: [{ type: 'text', text: `Claimed: ${filePath} -> ${agent} (${intent})` }] };
     },
   );
+}
 
-  // n2_work_log
+/** Register n2_work_log tool */
+function _registerWorkLogTool(server: McpToolServer, z: typeof ZodType): void {
   server.tool(
     'n2_work_log',
     'Log file changes during work. Reports created/modified/deleted files with descriptions.',
@@ -153,28 +263,22 @@ export function registerWorkSequence(
       if (!session) {
         return { content: [{ type: 'text', text: 'WARNING: No active work session. Logging skipped. Call n2_work_start for tracking.' }] };
       }
-
       if (filesCreated) session.filesCreated.push(...filesCreated);
       if (filesModified) session.filesModified.push(...filesModified);
       if (filesDeleted) session.filesDeleted.push(...filesDeleted);
       if (decisions) session.decisions.push(...decisions);
 
-      // Validate first-line comments
       const warnings: string[] = [];
       for (const f of (filesCreated ?? [])) {
         try {
           const fullPath = path.resolve(f.path);
-          if (!validateFirstLineComment(fullPath)) {
-            warnings.push(`MISSING first-line comment: ${f.path}`);
-          }
+          if (!validateFirstLineComment(fullPath)) warnings.push(`MISSING first-line comment: ${f.path}`);
         } catch (e) { logError('work:validate', e); }
       }
 
       const total = session.filesCreated.length + session.filesModified.length + session.filesDeleted.length;
       let msg = `Logged: ${total} file changes, ${session.decisions.length} decisions.`;
-      if (warnings.length > 0) {
-        msg += `\nWARNINGS:\n  ${warnings.join('\n  ')}`;
-      }
+      if (warnings.length > 0) msg += `\nWARNINGS:\n  ${warnings.join('\n  ')}`;
       if ((filesCreated && filesCreated.length > 0) || (filesDeleted && filesDeleted.length > 0)) {
         msg += `\nFile tree will auto-update at n2_work_end. Use n2_project_scan for immediate refresh.`;
       }
@@ -182,8 +286,10 @@ export function registerWorkSequence(
       return { content: [{ type: 'text', text: msg }] };
     },
   );
+}
 
-  // n2_context_search
+/** Register n2_context_search tool */
+function _registerContextSearchTool(server: McpToolServer, z: typeof ZodType, config: SoulConfig): void {
   server.tool(
     'n2_context_search',
     'Search across Brain memory and Ledger entries for relevant past context. Uses keyword matching with recency weighting.',
@@ -195,103 +301,27 @@ export function registerWorkSequence(
     },
     async ({ query, sources, maxResults }: ContextSearchInput) => {
       try {
-        const dataDir = config.DATA_DIR;
         const searchCfg = config.SEARCH ?? {};
         const minKwLen = searchCfg.minKeywordLength ?? 2;
-        const previewLen = searchCfg.previewLength ?? 200;
-        const recencyBonus = searchCfg.recencyBonus ?? 10;
-        const maxDepth = searchCfg.maxDepth ?? 6;
-        const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length >= minKwLen);
         const max = maxResults ?? searchCfg.defaultMaxResults ?? 10;
         const searchSources = sources ?? ['brain', 'ledger'];
+        const keywords = query.toLowerCase().split(/\s+/).filter(k => k.length >= minKwLen);
         const results: SearchResultItem[] = [];
-
-        function scoreText(text: string, filePath: string, source: string, meta: Partial<SearchResultItem> = {}): void {
-          if (!text) return;
-          const lower = text.toLowerCase();
-          let score = 0;
-          const matchedKeywords: string[] = [];
-          for (const kw of keywords) {
-            const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const count = (lower.match(new RegExp(escaped, 'g')) || []).length;
-            if (count > 0) { score += count; matchedKeywords.push(kw); }
-          }
-          if (score > 0) {
-            if (meta.timestamp) {
-              const age = (Date.now() - new Date(meta.timestamp).getTime()) / (1000 * 60 * 60 * 24);
-              score += Math.max(0, recencyBonus - age);
-            }
-            results.push({
-              source, path: filePath,
-              score: Math.round(score * 100) / 100,
-              matchedKeywords,
-              preview: text.slice(0, previewLen).replace(/\n/g, ' '),
-              ...meta,
-            });
-          }
-        }
+        const scoreCfg = { previewLen: searchCfg.previewLength ?? 200, recencyBonus: searchCfg.recencyBonus ?? 10 };
 
         if (searchSources.includes('brain')) {
-          const memoryDir = path.join(dataDir, 'memory');
-          if (fs.existsSync(memoryDir)) {
-            walkFiles(memoryDir, (fp) => {
-              const content = readFile(fp);
-              if (content) {
-                const relPath = path.relative(memoryDir, fp);
-                scoreText(content, `memory/${relPath}`, 'brain', {
-                  timestamp: fs.statSync(fp).mtime.toISOString(),
-                });
-              }
-            }, maxDepth);
-          }
+          _searchBrain(config.DATA_DIR, keywords, scoreCfg, searchCfg.maxDepth ?? 6, results);
         }
-
         if (searchSources.includes('ledger')) {
-          const projectsDir = path.join(dataDir, 'projects');
-          if (fs.existsSync(projectsDir)) {
-            for (const proj of fs.readdirSync(projectsDir)) {
-              const ledgerBase = path.join(projectsDir, proj, 'ledger');
-              if (!fs.existsSync(ledgerBase)) continue;
-              walkFiles(ledgerBase, (fp) => {
-                if (!fp.endsWith('.json')) return;
-                interface LedgerEntry { title?: string; summary?: string; decisions?: string[]; completedAt?: string; startedAt?: string; agent?: string }
-                const data = readJson<LedgerEntry>(fp);
-                if (!data) return;
-                const decisions = Array.isArray(data.decisions) ? data.decisions : [];
-                const text = [data.title ?? '', data.summary ?? '', ...decisions].filter(Boolean).join(' ');
-                const relPath = path.relative(projectsDir, fp);
-                scoreText(text, `projects/${relPath}`, 'ledger', {
-                  timestamp: data.completedAt ?? data.startedAt ?? '',
-                  agent: data.agent ?? '',
-                  title: data.title ?? '',
-                });
-              }, maxDepth);
-            }
-          }
+          _searchLedger(config.DATA_DIR, keywords, scoreCfg, searchCfg.maxDepth ?? 6, results);
         }
 
         results.sort((a, b) => b.score - a.score);
         const top = results.slice(0, max);
-
         if (top.length === 0) {
           return { content: [{ type: 'text', text: `🔍 No results for "${query}".` }] };
         }
-
-        const lines = top.map((r, i) => {
-          const icon = r.source === 'brain' ? '🧠' : '📖';
-          const meta = [
-            r.title ? `"${r.title}"` : '',
-            r.agent ? `by ${r.agent}` : '',
-            `score: ${r.score}`,
-          ].filter(Boolean).join(' | ');
-          return `${i + 1}. ${icon} ${r.path}\n   ${meta}\n   Keywords: [${r.matchedKeywords.join(', ')}]\n   ${r.preview}`;
-        });
-
-        return {
-          content: [{
-            type: 'text', text: `🔍 Context search: "${query}" (${top.length} results)\n\n${lines.join('\n\n')}`,
-          }],
-        };
+        return { content: [{ type: 'text', text: _formatSearchResults(query, top) }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text', text: `❌ Search error: ${msg}` }] };
@@ -299,3 +329,4 @@ export function registerWorkSequence(
     },
   );
 }
+

@@ -13,8 +13,7 @@ try {
   const rawConf: unknown = require('./config.local.js');
   local = (typeof rawConf === 'object' && rawConf !== null ? rawConf : {}) as DeepPartial<SoulConfig>;
 } catch (e: unknown) {
-  const err = e as NodeJS.ErrnoException;
-  if (err.code !== 'MODULE_NOT_FOUND') throw e;
+  if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code !== 'MODULE_NOT_FOUND') throw e;
 }
 
 /** Deep merge: local overrides default, nested objects are merged (not replaced) */
@@ -41,10 +40,12 @@ function deepMerge<T extends Record<string, unknown>>(
   return result as T;
 }
 
+type IndexedConfig = SoulConfig & Record<string, unknown>;
+
 const config: SoulConfig = deepMerge(
-  defaults as unknown as Record<string, unknown>,
-  local as unknown as DeepPartial<Record<string, unknown>>,
-) as unknown as SoulConfig;
+  defaults as IndexedConfig,
+  local as DeepPartial<IndexedConfig>,
+);
 
 // M3: Basic config validation — catch malformed config.local.js early
 if (!config.DATA_DIR || typeof config.DATA_DIR !== 'string') {

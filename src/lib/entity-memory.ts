@@ -41,6 +41,7 @@ interface BatchResult {
  * Entity types: person, hardware, project, concept, place, service
  */
 export class EntityMemory {
+  private static readonly MAX_ENTITIES = 500;
   private readonly filePath: string;
   private _cache: EntityStore | null;
 
@@ -97,10 +98,9 @@ export class EntityMemory {
     data.entities.push(newEntity);
 
     // Auto-cap: remove least-mentioned entities when exceeding limit
-    const MAX_ENTITIES = 500;
-    if (data.entities.length > MAX_ENTITIES) {
+    if (data.entities.length > EntityMemory.MAX_ENTITIES) {
       data.entities.sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0));
-      data.entities = data.entities.slice(0, MAX_ENTITIES);
+      data.entities = data.entities.slice(0, EntityMemory.MAX_ENTITIES);
     }
 
     this._save(data);
@@ -140,10 +140,9 @@ export class EntityMemory {
     }
 
     // Auto-cap after batch
-    const MAX_ENTITIES = 500;
-    if (data.entities.length > MAX_ENTITIES) {
+    if (data.entities.length > EntityMemory.MAX_ENTITIES) {
       data.entities.sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0));
-      data.entities = data.entities.slice(0, MAX_ENTITIES);
+      data.entities = data.entities.slice(0, EntityMemory.MAX_ENTITIES);
     }
 
     if (changed) this._save(data);

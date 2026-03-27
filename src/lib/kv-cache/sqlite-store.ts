@@ -105,54 +105,41 @@ export class SqliteStore {
       db = new _SQL.Database();
     }
 
-    const isToolCatalog = projectName === '_tool-catalog';
-
-    if (!isToolCatalog) {
-      db.run(`
-        CREATE TABLE IF NOT EXISTS snapshots (
-          id TEXT PRIMARY KEY,
-          agent_name TEXT NOT NULL,
-          agent_type TEXT DEFAULT 'external',
-          model TEXT,
-          started_at TEXT,
-          ended_at TEXT,
-          turn_count INTEGER DEFAULT 0,
-          token_estimate INTEGER DEFAULT 0,
-          keys TEXT DEFAULT '[]',
-          context TEXT DEFAULT '{}',
-          parent_session_id TEXT,
-          project_name TEXT NOT NULL,
-          created_at TEXT DEFAULT (datetime('now'))
-        )
-      `);
-      db.run(`CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_name, ended_at DESC)`);
-    }
-
-    if (isToolCatalog) {
-      db.run(`
-        CREATE TABLE IF NOT EXISTS tools (
-          name TEXT PRIMARY KEY,
-          description TEXT DEFAULT '',
-          source TEXT DEFAULT 'unknown',
-          category TEXT DEFAULT 'misc',
-          plugin_name TEXT DEFAULT '',
-          input_schema TEXT DEFAULT '{}',
-          triggers TEXT DEFAULT '[]',
-          tags TEXT DEFAULT '[]',
-          search_text TEXT DEFAULT '',
-          embedding TEXT DEFAULT '',
-          usage_count INTEGER DEFAULT 0,
-          success_rate REAL DEFAULT 1.0,
-          registered_at TEXT DEFAULT (datetime('now')),
-          updated_at TEXT DEFAULT (datetime('now'))
-        )
-      `);
-      db.run(`CREATE INDEX IF NOT EXISTS idx_tools_source ON tools(source)`);
-      db.run(`CREATE INDEX IF NOT EXISTS idx_tools_category ON tools(category)`);
-    }
+    if (projectName === '_tool-catalog') this._initToolCatalogSchema(db);
+    else this._initSnapshotSchema(db);
 
     this._dbs[projectName] = { db, dirty: false, path: dbPath };
     return db;
+  }
+
+  /** Initialize snapshot schema */
+  private _initSnapshotSchema(db: SqlJsDatabase): void {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS snapshots (
+        id TEXT PRIMARY KEY, agent_name TEXT NOT NULL, agent_type TEXT DEFAULT 'external',
+        model TEXT, started_at TEXT, ended_at TEXT, turn_count INTEGER DEFAULT 0,
+        token_estimate INTEGER DEFAULT 0, keys TEXT DEFAULT '[]', context TEXT DEFAULT '{}',
+        parent_session_id TEXT, project_name TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots(project_name, ended_at DESC)`);
+  }
+
+  /** Initialize tool catalog schema */
+  private _initToolCatalogSchema(db: SqlJsDatabase): void {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS tools (
+        name TEXT PRIMARY KEY, description TEXT DEFAULT '', source TEXT DEFAULT 'unknown',
+        category TEXT DEFAULT 'misc', plugin_name TEXT DEFAULT '',
+        input_schema TEXT DEFAULT '{}', triggers TEXT DEFAULT '[]', tags TEXT DEFAULT '[]',
+        search_text TEXT DEFAULT '', embedding TEXT DEFAULT '',
+        usage_count INTEGER DEFAULT 0, success_rate REAL DEFAULT 1.0,
+        registered_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_tools_source ON tools(source)`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_tools_category ON tools(category)`);
   }
 
   private _persist(projectName: string): void {
@@ -273,23 +260,12 @@ export class SqliteStore {
 
     for (const snap of snapshots) {
       const ts = new Date(snap.endedAt || snap.startedAt).getTime();
-
-      // Hard cutoff: delete if older than maxAgeDays
       if (ts < cutoff) {
         db.run('DELETE FROM snapshots WHERE id = ?', [snap.id]);
         deleted++;
         continue;
       }
-
-      // Forgetting Curve retention score
-      const importance = snap.importance ?? 0.5;
-      const accessCount = snap.accessCount || 0;
-      const lastAccessed = snap.lastAccessed || snap.endedAt || snap.startedAt;
-      const ageMs = Date.now() - new Date(lastAccessed).getTime();
-      const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24));
-      const score = Math.min(1.0, importance * (1 + Math.log2(1 + accessCount)) * Math.exp(-DECAY_RATE * ageDays));
-
-      survivors.push({ snap, score });
+      survivors.push({ snap, score: this._calcRetentionScore(snap, DECAY_RATE) });
     }
 
     // Enforce maxCount: remove lowest-scored snapshots
@@ -304,6 +280,16 @@ export class SqliteStore {
 
     if (deleted > 0) this._persist(projectName);
     return { deleted };
+  }
+
+  /** Calculate Forgetting Curve retention score */
+  private _calcRetentionScore(snap: SessionData, decayRate: number): number {
+    const importance = snap.importance ?? 0.5;
+    const accessCount = snap.accessCount || 0;
+    const lastAccessed = snap.lastAccessed || snap.endedAt || snap.startedAt;
+    const ageMs = Date.now() - new Date(lastAccessed).getTime();
+    const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24));
+    return Math.min(1.0, importance * (1 + Math.log2(1 + accessCount)) * Math.exp(-decayRate * ageDays));
   }
 
   private _resultToSession(columns: string[], values: SqlJsValue[]): SessionData {

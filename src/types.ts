@@ -60,6 +60,7 @@ export interface McpToolServer {
     // SDK handler accepts zod-inferred args — exact type varies per tool registration
     handler: (args: never) => Promise<McpToolResult>,
   ): void;
+  connect(transport: unknown): Promise<void>;
 }
 
 // ── Ledger ──

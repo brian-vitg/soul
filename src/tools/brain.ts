@@ -7,22 +7,12 @@ import type { EntityInput } from '../lib/entity-memory';
 import { CoreMemory } from '../lib/core-memory';
 import type { McpToolServer, SoulConfig, EntityType } from '../types';
 
-export function registerBrainTools(
-  server: McpToolServer,
-  z: typeof ZodType,
-  config: SoulConfig,
-): void {
-  const memoryDir = path.join(config.DATA_DIR, 'memory');
-  const entityMemory = new EntityMemory(config.DATA_DIR);
-  const coreMemory = new CoreMemory(config.DATA_DIR);
-
-  // ── Brain Read ──
+/** Register brain read/write tools */
+function _registerBrainIO(server: McpToolServer, z: typeof ZodType, memoryDir: string): void {
   server.tool(
     'n2_brain_read',
     'Read a file from shared memory (data/memory/). Agents share information here.',
-    {
-      filename: z.string().describe('File path relative to memory directory'),
-    },
+    { filename: z.string().describe('File path relative to memory directory') },
     async ({ filename }: { filename: string }) => {
       const filePath = safePath(filename, memoryDir);
       if (!filePath) return { content: [{ type: 'text', text: `BLOCKED: Path traversal denied — "${filename}"` }] };
@@ -32,7 +22,6 @@ export function registerBrainTools(
     },
   );
 
-  // ── Brain Write ──
   server.tool(
     'n2_brain_write',
     'Write a file to shared memory (data/memory/). Share information between agents.',
@@ -47,8 +36,10 @@ export function registerBrainTools(
       return { content: [{ type: 'text', text: `Saved: memory/${filename} (${content.length} chars)` }] };
     },
   );
+}
 
-  // ── Entity Upsert ──
+/** Register entity upsert/search tools */
+function _registerEntityTools(server: McpToolServer, z: typeof ZodType, entityMemory: EntityMemory): void {
   server.tool(
     'n2_entity_upsert',
     'Add or update entities (person, hardware, project, concept). Auto-merges attributes if entity exists.',
@@ -65,7 +56,6 @@ export function registerBrainTools(
     },
   );
 
-  // ── Entity Search ──
   server.tool(
     'n2_entity_search',
     'Search entities by keyword or type. Returns matching entities with attributes.',
@@ -75,42 +65,33 @@ export function registerBrainTools(
     },
     async ({ query, type }: { query?: string; type?: string }) => {
       let results: ReturnType<EntityMemory['list']>;
-      if (type) {
-        results = entityMemory.getByType(type as EntityType);
-      } else if (query) {
-        results = entityMemory.search(query);
-      } else {
-        results = entityMemory.list();
-      }
-      if (results.length === 0) {
-        return { content: [{ type: 'text', text: 'No entities found.' }] };
-      }
+      if (type) results = entityMemory.getByType(type as EntityType);
+      else if (query) results = entityMemory.search(query);
+      else results = entityMemory.list();
+      if (results.length === 0) return { content: [{ type: 'text', text: 'No entities found.' }] };
       const text = results.map(e =>
         `[${e.type}] ${e.name} (mentions: ${e.mentionCount ?? 0}) — ${JSON.stringify(e.attributes ?? {})}`,
       ).join('\n');
       return { content: [{ type: 'text', text: `Entities (${results.length}):\n${text}` }] };
     },
   );
+}
 
-  // ── Core Read ──
+/** Register core memory read/write tools */
+function _registerCoreMemoryTools(server: McpToolServer, z: typeof ZodType, coreMemory: CoreMemory): void {
   server.tool(
     'n2_core_read',
     'Read agent-specific core memory. Core memory is always loaded at boot for context injection.',
-    {
-      agent: z.string().describe('Agent name'),
-    },
+    { agent: z.string().describe('Agent name') },
     async ({ agent }: { agent: string }) => {
       const data = coreMemory.read(agent);
       const entries = Object.entries(data.memory ?? {});
-      if (entries.length === 0) {
-        return { content: [{ type: 'text', text: `Core memory for ${agent}: (empty)` }] };
-      }
+      if (entries.length === 0) return { content: [{ type: 'text', text: `Core memory for ${agent}: (empty)` }] };
       const text = entries.map(([k, v]) => `  ${k}: ${v}`).join('\n');
       return { content: [{ type: 'text', text: `Core memory for ${agent}:\n${text}` }] };
     },
   );
 
-  // ── Core Write ──
   server.tool(
     'n2_core_write',
     'Write to agent-specific core memory. Stored permanently, injected at every boot.',
@@ -125,3 +106,18 @@ export function registerBrainTools(
     },
   );
 }
+
+export function registerBrainTools(
+  server: McpToolServer,
+  z: typeof ZodType,
+  config: SoulConfig,
+): void {
+  const memoryDir = path.join(config.DATA_DIR, 'memory');
+  const entityMemory = new EntityMemory(config.DATA_DIR);
+  const coreMemory = new CoreMemory(config.DATA_DIR);
+
+  _registerBrainIO(server, z, memoryDir);
+  _registerEntityTools(server, z, entityMemory);
+  _registerCoreMemoryTools(server, z, coreMemory);
+}
+

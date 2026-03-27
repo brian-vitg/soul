@@ -23,6 +23,7 @@ interface SnapshotPatch {
 }
 
 const DECAY_RATE = 0.05;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /**
  * Forgetting Curve retention score.
@@ -33,7 +34,7 @@ export function calculateRetention(snap: SessionData): number {
   const accessCount = snap.accessCount || 0;
   const lastAccessed = snap.lastAccessed || snap.endedAt || snap.startedAt;
   const ageMs = Date.now() - new Date(lastAccessed).getTime();
-  const ageDays = Math.max(0, ageMs / (1000 * 60 * 60 * 24));
+  const ageDays = Math.max(0, ageMs / MS_PER_DAY);
 
   const decayFactor = Math.exp(-DECAY_RATE * ageDays);
   const accessBoost = 1 + Math.log2(1 + accessCount);
